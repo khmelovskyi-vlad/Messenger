@@ -91,6 +91,10 @@ namespace Messenger
         private async Task<bool> CheckBans()
         {
             var banUsers = await ReadData(BansNicknames);
+            if (banUsers == null)
+            {
+                return true;
+            }
             foreach (var banUser in banUsers)
             {
                 if (user.Nickname == banUser)
@@ -110,6 +114,10 @@ namespace Messenger
         {
             BanOnNickname();
             var banIPs = await ReadData(BansIP);
+            if (banIPs == null)
+            {
+                banIPs = new List<string>();
+            }
             foreach (var userIP in user.IPs)
             {
                 banIPs.Add(userIP);
@@ -140,9 +148,17 @@ namespace Messenger
             await DeleteDate(PeopleChatsPath, $@"{Users}\{user.Nickname}\peopleChatsBeen.json", $@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
             
             var banUsers = await ReadData(BansNicknames);
-            banUsers.Add(user.Nickname);
+            if (banUsers == null)
+            {
+                banUsers = new List<string>();
+                banUsers.Add(user.Nickname);
+            }
+            else
+            {
+                banUsers.Add(user.Nickname);
+            }
             await WriteData(BansNicknames, banUsers);
-            Directory.Delete($"{Users}\\{user.Nickname}", true);
+            //Directory.Delete($"{Users}\\{user.Nickname}", true);
         }
         private async Task DeleteDate(string pathTypeGroup, string pathUseGroups, string pathLeavedGroups)
         {
@@ -198,6 +214,10 @@ namespace Messenger
         private async Task ReadWriteData(string path)
         {
             var messages = await ReadData(path);
+            if (messages == null)
+            {
+                return;
+            }
             var newMessages = new List<string>();
             foreach (var message in messages)
             {

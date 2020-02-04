@@ -13,7 +13,7 @@ namespace Messenger
     {
         private static int age = 32;
         
-        static void Main(string[] args)
+        static async Task<int> Main(string[] args)
         {
             //var timeString = DateTime.Now.ToString();
             //StringBuilder stringBuilder = new StringBuilder();
@@ -54,8 +54,20 @@ namespace Messenger
             //var newS = s.Remove(0, 2);
             //Console.WriteLine(newS);
             //Console.ReadKey();
+            var timeString = DateTime.Now.ToString();
+            StringBuilder normalTime = new StringBuilder();
+            foreach (var timeChar in timeString)
+            {
+                if (timeChar == ':')
+                {
+                    normalTime.Append('.');
+                    continue;
+                }
+                normalTime.Append(timeChar);
+            }
             Server server = new Server();
-            server.Run(5);
+            await server.Run(5);
+            return 1;
             Console.ReadKey();
             if (args.Length != 0)
             {

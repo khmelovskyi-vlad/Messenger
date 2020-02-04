@@ -59,6 +59,7 @@ namespace Messenger
                 {
                     if (IP == IPBan)
                     {
+                        communication.SendMessage("Your IP is in ban, bye");
                         return true;
                     }
                 }

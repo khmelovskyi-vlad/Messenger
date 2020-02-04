@@ -36,7 +36,9 @@ namespace Messenger
         {
             user.communication.SendMessage("If you want exit, write: ?/end\n\r" +
                 "If you want leave a group, write: ?/leave a group\n\r" +
-                "If you want delete user, write: ?/delete user", user.Socket);
+                "If you want delete user, write: ?/delete user\n\r" +
+                "If you want send file, write: ?/send\n\r" +
+                "If you want download file, write: ?/download\n\r", user.Socket);
             user.communication.AnswerClient(user.Socket);
             if (firstConnect)
             {
@@ -65,16 +67,78 @@ namespace Messenger
                 {
                     await DeleteUser();
                 }
-                else if (message == "?/send file")
+                else if (message == "?/send")
+                {
+                    message = await ReciveFile();
+                }
+                else if (message == "?/download")
                 {
                     SendFile();
+                    continue;
                 }
-                SendMessage(user);
+                SendMessage(user, message);
             }
         }
         private void SendFile()
         {
-
+            UsersOnline.Remove(user);
+            user.communication.SendMessage("ok");
+            user.communication.AnswerClient();
+            var fileName = user.communication.data.ToString();
+            var filesPaths = Directory.GetFiles(pathChat);
+            foreach (var filePath in filesPaths)
+            {
+                var file = Path.GetFileName(filePath);
+                if (file.Length > 19)
+                {
+                    var fileWithoutData = file.Remove(0, 19);
+                    if (fileWithoutData == fileName)
+                    {
+                        user.communication.SendMessage("Finded");
+                        user.communication.AnswerClient();
+                        user.Socket.SendFile(filePath);
+                        UsersOnline.Add(user);
+                        return;
+                    }
+                }
+            }
+            user.communication.SendMessage("Didn`t find");
+            UsersOnline.Add(user);
+        }
+        private async Task<string> ReciveFile()
+        {
+            UsersOnline.Remove(user);
+            user.communication.SendMessage("Check your file");
+            user.communication.AnswerClient();
+            var nameFile = user.communication.data.ToString();
+            user.communication.SendMessage("Ok");
+            var timeString = DateTime.Now.ToString();
+            StringBuilder normalTime = new StringBuilder();
+            foreach (var timeChar in timeString)
+            {
+                if (timeChar == ':')
+                {
+                    normalTime.Append('.');
+                    continue;
+                }
+                normalTime.Append(timeChar);
+            }
+            var filePath = $@"{pathChat}\\{normalTime}{nameFile}";
+            await WriteFile(filePath);
+            UsersOnline.Add(user);
+            return nameFile;
+        }
+        public async Task WriteFile(string path)
+        {
+            buffer = new byte[size];
+            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                do
+                {
+                    var size = user.Socket.Receive(buffer);
+                    await stream.WriteAsync(buffer, 0, size);
+                } while (user.Socket.Available > 0);
+            }
         }
         private async Task DeleteUser()
         {
@@ -132,14 +196,18 @@ namespace Messenger
                 user.communication.AnswerClient(user.Socket);
             }
         }
-        private void SendMessage(User user)
+        private void CheckFile()
+        {
+
+        }
+        private void SendMessage(User user, string message)
         {
             //var now = DateTime.Now.ToString();
-            var message = $"{user.Nickname}: {user.communication.data.ToString()}\n\r{DateTime.Now.ToString()}";
-            SendMessageAllUsers(user, message);
+            var messageSend = $"{user.Nickname}: {message}\n\r{DateTime.Now.ToString()}";
+            SendMessageAllUsers(user, messageSend);
             lock (lockObj)
             {
-                SaveMessage(message);
+                SaveMessage(messageSend);
             }
         }
         private void SendMessageAllUsers(User user, string message)
@@ -198,52 +266,5 @@ namespace Messenger
 
         AutoResetEvent resetSend = new AutoResetEvent(false);
         AutoResetEvent resetReceive = new AutoResetEvent(false);
-        private void AnswerClient(Socket listener)
-        {
-            buffer = new byte[size];
-            data = new StringBuilder();
-            do
-            {
-                listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
-                resetReceive.WaitOne();
-            } while (listener.Available > 0);
-        }
-        private void ReceiveCallback(IAsyncResult AR)
-        {
-            Socket current = (Socket)AR.AsyncState;
-            int received;
-
-            try
-            {
-                received = current.EndReceive(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Client forcefully disconnected");
-                resetReceive.Set();
-                return;
-            }
-            data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-            resetReceive.Set();
-        }
-        private void SendMessage(string message, Socket listener)
-        {
-            byte[] byteData = Encoding.ASCII.GetBytes(message);
-            listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-            resetSend.WaitOne();
-        }
-        private void SendCallback(IAsyncResult AR)
-        {
-            Socket current = (Socket)AR.AsyncState;
-            try
-            {
-                current.EndSend(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Can`t send message");
-            }
-            resetSend.Set();
-        }
     }
 }

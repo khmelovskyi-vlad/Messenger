@@ -43,5 +43,16 @@ namespace Messenger
                 }
             }, tcpSocket));
         }
+        //private void Test(Socket listener)
+        //{
+        //    var s = "IMG_20191203_201515.jpg";
+        //    //var firstMessage = Encoding.ASCII.GetBytes(@"D:\temp\ok\IMG_20191203_201515.jpg");
+        //    //var lastMessage = Encoding.ASCII.GetBytes("Thanks");
+        //    //listener.SendFile(@"D:\temp\ok2\IMG_20191203_201515.jpg", firstMessage, lastMessage, TransmitFileOptions.ReuseSocket);
+        //    listener.Send(Encoding.ASCII.GetBytes("IMG_20191203_201515.jpg"));
+        //    var buffer = new byte[256];
+        //    listener.Receive(buffer);
+        //    listener.SendFile($@"D:\temp\ok2\{s}");
+        //}
     }
 }
