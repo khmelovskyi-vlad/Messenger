@@ -43,6 +43,19 @@ namespace Messenger
                 }
             }, tcpSocket));
         }
+        //private void Test(Socket socket)
+        //{
+        //    var path = @"D:\temp\k.mp4";
+        //    //var path = @"D:\temp\ok2";
+        //    var s = File.Exists(path);
+        //    Console.WriteLine(s);
+        //    if (s)
+        //    {
+        //        socket.SendFile(path);
+        //        Console.ReadKey();
+        //    }
+        //    Console.ReadKey();
+        //}
         //private void Test(Socket listener)
         //{
         //    var s = "IMG_20191203_201515.jpg";

@@ -82,6 +82,11 @@ namespace Messenger
             var usersJson = JsonConvert.SerializeObject(users);
             await WriteDeleteData($"{pathChat}\\users.json", usersJson);
 
+            if (pathsElement[0] == "peopleChatsBeen")
+            {
+                await DeletePeopleChatsBeen(pathsElement);
+                return needDeleteGroup;
+            }
 
             var nameChats = new List<string>();
             using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
@@ -93,6 +98,27 @@ namespace Messenger
             var nameChatsJson = JsonConvert.SerializeObject(nameChats);
             await WriteDeleteData($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", nameChatsJson);
             return needDeleteGroup;
+        }
+        private async Task DeletePeopleChatsBeen(string[] pathsElement)
+        {
+            List<PersonChat> nameChats;
+            using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var nameChatsJsonSb = await ReadFile(stream);
+                nameChats = JsonConvert.DeserializeObject<List<PersonChat>>(nameChatsJsonSb.ToString());
+            }
+            if (nameChats != null)
+            {
+                PersonChat needChat = new PersonChat(new string[2], "");
+                foreach (var nameChat in nameChats)
+                {
+                    needChat = nameChat;
+                    break;
+                }
+                nameChats.Remove(needChat);
+                var nameChatsJson = JsonConvert.SerializeObject(nameChats);
+                await WriteDeleteData($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", nameChatsJson);
+            }
         }
         private async Task WriteDeleteData(string path, string data)
         {

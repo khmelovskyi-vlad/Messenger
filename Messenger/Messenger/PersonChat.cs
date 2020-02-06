@@ -8,12 +8,12 @@ namespace Messenger
 {
     class PersonChat
     {
-        public PersonChat(string nickname, string nameChat)
+        public PersonChat(string[] nicknames, string nameChat)
         {
-            this.Nickname = nickname;
+            this.Nicknames = nicknames;
             this.NameChat = nameChat;
         }
-        public string Nickname;
+        public string[] Nicknames;
         public string NameChat;
     }
 }
