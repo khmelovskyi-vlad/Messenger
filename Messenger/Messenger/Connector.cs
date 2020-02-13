@@ -231,6 +231,7 @@ namespace Messenger
                     if (!successSaveData)
                     {
                         ConnectNewUserToOlds(userData);
+                        //await ConnectNewUserToOlds(userData);
                     }
                     return true;
                 }

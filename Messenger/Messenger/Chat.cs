@@ -12,9 +12,8 @@ namespace Messenger
 {
     class Chat
     {
-        public Chat(User user, string typtChat, string nameChat, string pathChat)
+        public Chat(string typtChat, string nameChat, string pathChat)
         {
-            this.user = user;
             this.TypeChat = typtChat;
             this.NameChat = nameChat;
             this.PathChat = pathChat;
@@ -32,7 +31,7 @@ namespace Messenger
         public string NameChat { get; set; }
 
         public List<User> UsersOnline = new List<User>();
-        private User user { get; }
+        public List<User> UsersOnlineToCheck = new List<User>();
         private string TypeChat { get; set; }
         private StringBuilder data;
         private byte[] buffer;
@@ -44,6 +43,7 @@ namespace Messenger
 
         public async Task Run(User user, bool firstConnect)
         {
+            //Interlocked.Add()
             user.communication.SendMessage(message, user.Socket);
             user.communication.AnswerClient(user.Socket);
             if (firstConnect)
@@ -71,11 +71,11 @@ namespace Messenger
                 }
                 else if (message == "?/delete user")
                 {
-                    await DeleteUser();
+                    await DeleteUser(user);
                 }
                 else if (message == "?/send")
                 {
-                    message = await ReciveFile();
+                    message = await ReciveFile(user);
                     if (message == "?")
                     {
                         continue;
@@ -83,7 +83,7 @@ namespace Messenger
                 }
                 else if (message == "?/download")
                 {
-                    SendFile();
+                    SendFile(user);
                     continue;
                 }
                 else if (message == "?/change")
@@ -94,8 +94,151 @@ namespace Messenger
                         continue;
                     }
                 }
+                else if (message == "?/invite")
+                {
+                    if (TypeChat == "pg" || TypeChat == "ug" || TypeChat == "sg")
+                    {
+                        await InvitePerson(user);
+                        continue;
+                    }
+                }
                 SendMessage(user, message);
             }
+        }
+        private void RemoveUser(User user)
+        {
+            UsersOnlineToCheck.Add(user);
+            UsersOnline.Remove(user);
+        }
+        private void AddUser(User user)
+        {
+            UsersOnline.Add(user);
+            UsersOnlineToCheck.Remove(user);
+        }
+        private async Task InvitePerson(User user)
+        {
+            RemoveUser(user);
+            user.communication.SendMessage("Write the name of the person you want to add");
+            user.communication.AnswerClient();
+            var namePerson = user.communication.data.ToString();
+            if (namePerson == "?")
+            {
+                AddUser(user);
+                return;
+            }
+            if (await CheckPerson(namePerson))
+            {
+                if (await CheckUsersOrleavedPeopleOrInvitation(namePerson, $@"{PathChat}\leavedPeople.json"))
+                {
+                    if (await CheckUsersOrleavedPeopleOrInvitation(namePerson, $@"{PathChat}\users.json"))
+                    {
+                        if (await CheckUsersOrleavedPeopleOrInvitation(namePerson, $@"{PathChat}\invitation.json"))
+                        {
+                            await AddInvites(namePerson);
+                            AddUser(user);
+                            user.communication.SendMessage("Invited person");
+                            return;
+                        }
+                        user.communication.SendMessage("This person has invitation");
+                        return;
+                    }
+                    user.communication.SendMessage("This person is in group");
+                    return;
+                }
+                user.communication.SendMessage("This person leaved the group");
+                return;
+            }
+            user.communication.SendMessage("Don`t have this person");
+        }
+        private async Task AddInvites(string namePerson)
+        {
+            List<string> userInvitations;
+            var userPath = $@"D:\temp\messenger\Users\{namePerson}\invitation.json";
+            using (var stream = File.Open(userPath, FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var invitationsJsonSb = await ReadFile(stream);
+                userInvitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSb.ToString());
+            }
+            string partInvitation;
+            switch (TypeChat)
+            {
+                case "pg":
+                    partInvitation = "public: ";
+                    break;
+                case "ug":
+                    partInvitation = "public: ";
+                    break;
+                case "sg":
+                    partInvitation = "secret: ";
+                    break;
+                default:
+                    partInvitation = "";
+                    break;
+            }
+            if (userInvitations == null)
+            {
+                userInvitations = new List<string>();
+            }
+            userInvitations.Add($"{partInvitation}{NameChat}");
+            await WriteData(userPath, JsonConvert.SerializeObject(userInvitations));
+            List<string> groupInvitations;
+            var groupPath = $@"{PathChat}\invitation.json";
+            using (var stream = File.Open(groupPath, FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var invitationsJsonSb = await ReadFile(stream);
+                groupInvitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSb.ToString());
+            }
+            if (groupInvitations == null)
+            {
+                groupInvitations = new List<string>();
+            }
+            groupInvitations.Add(namePerson);
+            await WriteData(groupPath, JsonConvert.SerializeObject(groupInvitations));
+        }
+        private async Task WriteData(string path, string data)
+        {
+            using (var stream = new StreamWriter(path, false))
+            {
+                await stream.WriteAsync(data);
+            }
+        }
+        private async Task<bool> CheckPerson(string namePerson)
+        {
+            List<UserNicknameAndPasswordAndIPs> users;
+            using (var stream = File.Open(@"D:\temp\messenger\nicknamesAndPasswords\users.json", FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var usersJson = await ReadFile(stream);
+                users = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+            }
+            foreach (var user in users)
+            {
+                if (user.Nickname == namePerson)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        private async Task<bool> CheckUsersOrleavedPeopleOrInvitation(string namePerson, string path)
+        {
+            List<string> users;
+            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var usersJson = await ReadFile(stream);
+                users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
+            }
+            if (users == null)
+            {
+                return true;
+            }
+            foreach (var user in users)
+            {
+                if (user == namePerson)
+                {
+                    return false;
+                }
+            }
+            return true;
         }
         private void ChangeTypeGroup(string typeGroup)
         {
@@ -110,7 +253,7 @@ namespace Messenger
         }
         private async Task ChangeTypeGroup(User user)
         {
-            UsersOnline.Remove(user);
+            RemoveUser(user);
             user.communication.SendMessage("Write type new group\n\r" +
                 "If public - write public\n\r" +
                 "If secret - write secret");
@@ -120,7 +263,7 @@ namespace Messenger
             switch (typeNewGroup)
             {
                 case "?":
-                    UsersOnline.Add(user);
+                    AddUser(user);
                     return;
                 case "public":
                     pathNewGroup = @"D:\temp\messenger\publicGroup";
@@ -138,7 +281,7 @@ namespace Messenger
                 var nameNewGroup = user.communication.data.ToString();
                 if (nameNewGroup == "?")
                 {
-                    UsersOnline.Add(user);
+                    AddUser(user);
                     return;
                 }
                 if (CheckGroups(nameNewGroup, pathNewGroup, user))
@@ -154,7 +297,7 @@ namespace Messenger
                     PathChat = newPath;
                     NameChat = nameNewGroup;
                     user.communication.SendMessage($"New group have {typeNewGroup} type and name {nameNewGroup}");
-                    UsersOnline.Add(user);
+                    AddUser(user);
                     return;
                 }
             }
@@ -298,41 +441,77 @@ namespace Messenger
             }
             return true;
         }
-        private void SendFile()
+        private void SendFile(User user)
         {
-            UsersOnline.Remove(user);
-            user.communication.SendMessage("ok");
+            RemoveUser(user);
+            user.communication.SendMessage("Write chat name");
             user.communication.AnswerClient();
             var fileName = user.communication.data.ToString();
             var filesPaths = Directory.GetFiles(PathChat);
+            var needFilesPaths = new List<string>();
             foreach (var filePath in filesPaths)
             {
                 var file = Path.GetFileName(filePath);
                 if (file.Length > 19)
                 {
-                    var fileWithoutData = file.Remove(0, 19);
-                    if (fileWithoutData == fileName)
+                    var fileWithoutDate = file.Remove(0, 19);
+                    if (fileWithoutDate == fileName)
                     {
-                        user.communication.SendMessage("Finded");
-                        user.communication.AnswerClient();
-                        user.Socket.SendFile(filePath);
-                        UsersOnline.Add(user);
-                        return;
+                        needFilesPaths.Add(filePath);
                     }
                 }
             }
+            if (needFilesPaths.Count > 0)
+            {
+                var findNeedFile = false;
+                if (needFilesPaths.Count > 1)
+                {
+                    findNeedFile = FindNeedFile(needFilesPaths, user);
+                }
+                if (needFilesPaths.Count == 1 || findNeedFile)
+                {
+                    user.communication.SendMessage("Finded");
+                    user.communication.AnswerClient();
+                    user.Socket.SendFile(needFilesPaths[0]);
+                    AddUser(user);
+                    return;
+                }
+            }
             user.communication.SendMessage("Didn`t find");
-            UsersOnline.Add(user);
+            AddUser(user);
         }
-        private async Task<string> ReciveFile()
+        private bool FindNeedFile(List<string> filesPaths, User user)
         {
-            UsersOnline.Remove(user);
+            var allData = new StringBuilder();
+            var dates = new List<string>();
+            foreach (var filePath in filesPaths)
+            {
+                var file = Path.GetFileName(filePath);
+                var date = file.Substring(0, 19);
+                dates.Add(date);
+                allData.Append($"{date}\n\r");
+            }
+            user.communication.SendMessage($"Have some files, chose date:\n\r{allData}Write need date");
+            user.communication.AnswerClient();
+            var message = user.communication.data.ToString();
+            foreach (var date in dates)
+            {
+                if (date == message)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+        private async Task<string> ReciveFile(User user)
+        {
+            RemoveUser(user);
             user.communication.SendMessage("Check your file");
             user.communication.AnswerClient();
             var nameFile = user.communication.data.ToString();
             if (nameFile == "?")
             {
-                UsersOnline.Add(user);
+                AddUser(user);
                 return nameFile;
             }
             user.communication.SendMessage("Ok");
@@ -348,11 +527,11 @@ namespace Messenger
                 normalTime.Append(timeChar);
             }
             var filePath = $@"{PathChat}\\{normalTime}{nameFile}";
-            await WriteFile(filePath);
-            UsersOnline.Add(user);
+            await WriteFile(filePath, user);
+            AddUser(user);
             return nameFile;
         }
-        public async Task WriteFile(string path)
+        public async Task WriteFile(string path, User user)
         {
             buffer = new byte[size];
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
@@ -364,7 +543,7 @@ namespace Messenger
                 } while (user.Socket.Available > 0);
             }
         }
-        private async Task DeleteUser()
+        private async Task DeleteUser(User user)
         {
             while (true)
             {
@@ -373,7 +552,7 @@ namespace Messenger
                 var nickname = user.communication.data.ToString();
                 if (await CheckHavingNick(nickname))
                 {
-                    GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, PathChat, TypeChat, user.communication, NameChat);
+                    GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, PathChat, TypeChat, user.communication, NameChat);
                     if (await groupsLeaver.Leave())
                     {
                         user.communication.SendMessage("Deleted this user");
@@ -438,10 +617,10 @@ namespace Messenger
         {
             foreach (var userOnline in UsersOnline)
             {
-                if (userOnline.Nickname != user.Nickname)
-                {
+                //if (userOnline.Nickname != user.Nickname)
+                //{
                     userOnline.communication.SendMessage(message, userOnline.Socket);
-                }
+                //}
             }
         }
         private async void SaveMessage(string message)

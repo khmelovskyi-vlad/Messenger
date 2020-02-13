@@ -45,11 +45,22 @@ namespace Messenger
                 {
                     online.Add(nickname);
                 }
-                GroupMaster groupMaster = new GroupMaster(listener, nickname);
-                var userInformation = await groupMaster.Run();
-                if (userInformation.Length == 3 && userInformation[0] != "")
+                while (true)
                 {
-                    await OpenCreateChat(listener, nickname, userInformation);
+                    GroupMaster groupMaster = new GroupMaster(listener, nickname);
+                    var userInformation = await groupMaster.Run();
+                    if (userInformation.Length == 3 && userInformation[0] != "")
+                    {
+                        await OpenCreateChat(listener, nickname, userInformation);
+                        if (CheckLeftMessanger(listener))
+                        {
+                            break;
+                        }
+                    }
+                    else
+                    {
+                        break;
+                    }
                 }
                 lock (locketOnline)
                 {
@@ -58,6 +69,22 @@ namespace Messenger
                 return true;
             }
             return false;
+        }
+        private bool CheckLeftMessanger(Socket listener)
+        {
+            Communication communication = new Communication(listener);
+            communication.SendMessage("If you want left the messanger, write: exit");
+            communication.AnswerClient();
+            if (communication.data.ToString() == "exit")
+            {
+                communication.SendMessage("You left the messanger");
+                return true;
+            }
+            else
+            {
+                communication.SendMessage("Ok, choose new chat");
+                return false;
+            }
         }
         private bool CheckOnline(string nickname, Socket listener)
         {
@@ -86,7 +113,7 @@ namespace Messenger
             }
             if (!findChat)
             {
-                Chat chat = new Chat(user, information[0], information[1], information[2]);
+                Chat chat = new Chat(information[0], information[1], information[2]);
                 chats.Add(chat);
                 await chat.Run(user, true);
                 CheckOnline(chat);
@@ -96,7 +123,10 @@ namespace Messenger
         {
             if (chat.UsersOnline.Count == 0)
             {
-                chats.Remove(chat);
+                if (chat.UsersOnlineToCheck.Count == 0)
+                {
+                    chats.Remove(chat);
+                }
             }
         }
         private User CreateUser(Socket listener, string nick)

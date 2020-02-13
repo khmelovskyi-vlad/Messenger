@@ -23,9 +23,10 @@ namespace Messenger
         private string user;
         private string pathChat;
         private string typeChat;
+        private PersonChat needChat;
         public async Task<bool> Leave()
         {
-            var pathElements = FindPathsElement();
+            var pathElements = await FindPathsElement();
             if (!await DeleteData(pathElements))
             {
                 await AddData(pathElements);
@@ -48,7 +49,7 @@ namespace Messenger
             //    return false;
             //}
         }
-        private string[] FindPathsElement()
+        private async Task<string[]> FindPathsElement()
         {
             if (typeChat == "pg" || typeChat == "ug")
             {
@@ -80,11 +81,11 @@ namespace Messenger
                 needDeleteGroup = true;
             }
             var usersJson = JsonConvert.SerializeObject(users);
-            await WriteDeleteData($"{pathChat}\\users.json", usersJson);
+            await WriteData($"{pathChat}\\users.json", usersJson);
 
             if (pathsElement[0] == "peopleChatsBeen")
             {
-                await DeletePeopleChatsBeen(pathsElement);
+                await DeletePeopleChatsBeen("peopleChatsBeen");
                 return needDeleteGroup;
             }
 
@@ -96,35 +97,30 @@ namespace Messenger
             }
             nameChats.Remove(NameChat);
             var nameChatsJson = JsonConvert.SerializeObject(nameChats);
-            await WriteDeleteData($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", nameChatsJson);
+            await WriteData($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", nameChatsJson);
             return needDeleteGroup;
         }
-        private async Task DeletePeopleChatsBeen(string[] pathsElement)
+        private async Task DeletePeopleChatsBeen(string pathsElement)
         {
             List<PersonChat> nameChats;
-            using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", FileMode.OpenOrCreate, FileAccess.Read))
+            using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement}.json", FileMode.OpenOrCreate, FileAccess.Read))
             {
                 var nameChatsJsonSb = await ReadFile(stream);
                 nameChats = JsonConvert.DeserializeObject<List<PersonChat>>(nameChatsJsonSb.ToString());
             }
             if (nameChats != null)
             {
-                PersonChat needChat = new PersonChat(new string[2], "");
                 foreach (var nameChat in nameChats)
                 {
-                    needChat = nameChat;
-                    break;
+                    if (nameChat.NameChat == NameChat)
+                    {
+                        needChat = nameChat;
+                        break;
+                    }
                 }
                 nameChats.Remove(needChat);
                 var nameChatsJson = JsonConvert.SerializeObject(nameChats);
-                await WriteDeleteData($@"D:\temp\messenger\Users\{user}\{pathsElement[0]}.json", nameChatsJson);
-            }
-        }
-        private async Task WriteDeleteData(string path, string data)
-        {
-            using (var stream = new StreamWriter(path, false))
-            {
-                await stream.WriteAsync(data);
+                await WriteData($@"D:\temp\messenger\Users\{user}\{pathsElement}.json", nameChatsJson);
             }
         }
         private async Task AddData(string[] pathsElement)
@@ -133,32 +129,45 @@ namespace Messenger
             {
                 var usersJson = await ReadFile(stream);
                 var users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-                if (users != null)
-                {
-                    users.Add(user);
-                }
-                else
+                if (users == null)
                 {
                     users = new List<string>();
-                    users.Add(user);
                 }
+                users.Add(user);
                 await Write(stream, users);
+            }
+            if (pathsElement[0] == "peopleChatsBeen")
+            {
+                await AddPeopleChatsBeen("leavedPeopleChatsBeen");
+                return;
             }
             using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement[1]}.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
             {
                 var usersJson = await ReadFile(stream);
                 var users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-                if (users != null)
-                {
-                    users.Add(NameChat);
-                }
-                else
+                if (users == null)
                 {
                     users = new List<string>();
-                    users.Add(NameChat);
                 }
+                users.Add(NameChat);
                 await Write(stream, users);
             }
+        }
+        private async Task AddPeopleChatsBeen(string pathsElement)
+        {
+            List<PersonChat> nameChats;
+            using (var stream = File.Open($@"D:\temp\messenger\Users\{user}\{pathsElement}.json", FileMode.OpenOrCreate, FileAccess.Read))
+            {
+                var nameChatsJsonSb = await ReadFile(stream);
+                nameChats = JsonConvert.DeserializeObject<List<PersonChat>>(nameChatsJsonSb.ToString());
+            }
+            if (nameChats == null)
+            {
+                nameChats = new List<PersonChat>();
+            }
+            nameChats.Add(needChat);
+            var nameChatsJson = JsonConvert.SerializeObject(nameChats);
+            await WriteData($@"D:\temp\messenger\Users\{user}\{pathsElement}.json", nameChatsJson);
         }
         private async Task Write(FileStream stream, List<string> users)
         {
@@ -252,45 +261,73 @@ namespace Messenger
             var invitationPaths = await FindUserPath($"{pathChat}\\invitation.json", "\\invitation.json");
             if (invitationPaths != null)
             {
-                await DeleteExtraData(invitationPaths, invitationName, "");
+                await DeleteExtraData(invitationPaths, invitationName);
             }
-            var leavedPaths = await FindUserPath($"{pathChat}\\leavedPeople.json", "");
+            var leavedPaths = await FindUserPath($"{pathChat}\\leavedPeople.json", $"\\{pathsElement[1]}.json");
             if (leavedPaths != null)
             {
-                await DeleteExtraData(leavedPaths, NameChat, $"\\{pathsElement[1]}.json");
+                if (typeChat == "pp" || typeChat == "ch")
+                {
+                    await DeleteLeavedPeople(leavedPaths);
+                    return;
+                }
+                await DeleteExtraData(leavedPaths, NameChat);
             }
         }
-        private async Task DeleteExtraData(List<string> paths, string nameChat, string lastPartOfPath)
+        private async Task DeleteLeavedPeople(List<string> paths)
         {
             foreach (var path in paths)
             {
-                var normalPath = $"{path}{lastPartOfPath}";
+                List<PersonChat> nameChats;
+                using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
+                {
+                    var usersJson = await ReadFile(stream);
+                    nameChats = JsonConvert.DeserializeObject<List<PersonChat>>(usersJson.ToString());
+                }
+                foreach (var nameChat in nameChats)
+                {
+                    if (nameChat.NameChat == NameChat)
+                    {
+                        needChat = nameChat;
+                        break;
+                    }
+                }
+                nameChats.Remove(needChat);
+                var usersJsonNew = JsonConvert.SerializeObject(nameChats);
+                await WriteData(path, usersJsonNew);
+            }
+        }
+        private async Task DeleteExtraData(List<string> paths, string nameChat)
+        {
+            foreach (var path in paths)
+            {
                 var users = new List<string>();
-                using (var stream = File.Open(normalPath, FileMode.OpenOrCreate, FileAccess.Read))
+                using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
                 {
                     var usersJson = await ReadFile(stream);
                     users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
                 }
                 users.Remove(nameChat);
                 var usersJsonNew = JsonConvert.SerializeObject(users);
-                await WriteData(normalPath, usersJsonNew);
+                await WriteData(path, usersJsonNew);
             }
         }
         private async Task<List<string>> FindUserPath(string path, string lastPartOfPath)
         {
             var leavedPaths = new List<string>();
+            List<string> users;
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
             {
                 var usersJson = await ReadFile(stream);
-                var users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-                if (users == null)
-                {
-                    return null;
-                }
-                foreach (var user in users)
-                {
-                    leavedPaths.Add($@"D:\temp\messenger\Users\{user}{lastPartOfPath}");
-                }
+                users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
+            }
+            if (users == null)
+            {
+                return null;
+            }
+            foreach (var user in users)
+            {
+                leavedPaths.Add($@"D:\temp\messenger\Users\{user}{lastPartOfPath}");
             }
             return leavedPaths;
         }

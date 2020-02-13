@@ -8,9 +8,9 @@ namespace Messenger
 {
     class PersonChat
     {
-        public PersonChat(string[] nicknames, string nameChat)
+        public PersonChat(string[] nickname, string nameChat)
         {
-            this.Nicknames = nicknames;
+            this.Nicknames = nickname;
             this.NameChat = nameChat;
         }
         public string[] Nicknames;

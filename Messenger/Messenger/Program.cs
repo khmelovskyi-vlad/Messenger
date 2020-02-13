@@ -54,17 +54,18 @@ namespace Messenger
             //var newS = s.Remove(0, 2);
             //Console.WriteLine(newS);
             //Console.ReadKey();
-            var timeString = DateTime.Now.ToString();
-            StringBuilder normalTime = new StringBuilder();
-            foreach (var timeChar in timeString)
-            {
-                if (timeChar == ':')
-                {
-                    normalTime.Append('.');
-                    continue;
-                }
-                normalTime.Append(timeChar);
-            }
+
+            //var timeString = DateTime.Now.ToString();
+            //StringBuilder normalTime = new StringBuilder();
+            //foreach (var timeChar in timeString)
+            //{
+            //    if (timeChar == ':')
+            //    {
+            //        normalTime.Append('.');
+            //        continue;
+            //    }
+            //    normalTime.Append(timeChar);
+            //}
             Server server = new Server();
             await server.Run(5);
             return 1;
@@ -102,6 +103,7 @@ namespace Messenger
             myProcess.Start();
             Console.ReadLine();
             Console.WriteLine(age);
+            var sv = myProcess.StandardInput;
 
         }
         private static void AlternatePathOfExecution()

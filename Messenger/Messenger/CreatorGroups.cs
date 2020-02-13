@@ -52,9 +52,20 @@ namespace Messenger
             {
                 AnswerClient();
                 var groupName = data.ToString();
-                if (groupName[0] == '?')
+                var findSymdol = false;
+                foreach (var symbol in groupName)
                 {
-                    SendMessage("Group name can`t start with '?', enter new");
+                    if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
+                        || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
+                    {
+                        findSymdol = true;
+                        var invertedComma = '"';
+                        SendMessage($"nickname cannot contain characters such as:\n\r' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|'");
+                        break;
+                    }
+                }
+                if (findSymdol)
+                {
                     continue;
                 }
                 else if (!CheckGroups(groupName, typeGroup))
@@ -68,7 +79,7 @@ namespace Messenger
         private bool CheckGroups(string nameGroup, string typeGroup)
         {
             string[] groups;
-            if (typeGroup == "p")
+            if (typeGroup == "pg")
             {
                 groups = Directory.GetDirectories(@"D:\temp\messenger\publicGroup");
             }
@@ -78,8 +89,8 @@ namespace Messenger
             }
             foreach (var group in groups)
             {
-                var rgroup = Path.GetFileName(group);
-                if (nameGroup == rgroup)
+                var groupWithoutPath = Path.GetFileName(group);
+                if (nameGroup == groupWithoutPath)
                 {
                     return false;
                 }

@@ -64,18 +64,22 @@ namespace Messenger
                     "Write all user groups: ?/ug, find user group: ?/ug...\n\r" +
                     "Write all public groups: ?/pg, find public group: ?/pg...\n\r" +
                     "Write all invitations: ?/ii, find invitation: ?/ii...\n\r" +
-                    "If you want create new group, write ?/ng", listener);
+                    "If you want create new group, write ?/ng\n\r" +
+                    "If you want exit, write: exit\n\r", listener);
                 communication.AnswerClient(listener);
                 var message = communication.data.ToString();
-                if (message.Length > 2 && message[0] == '?' && message[1] == '/')
+                if (message.Length > 3 && message[0] == '?' && message[1] == '/')
                 {
+                    communication.SendMessage("Ok");
+                    communication.AnswerClient();
                     if (message.Length == 4)
                     {
                         var information = await ChoseGroupSend(listener, allChats, message, nick);
-                        if (information.Length == 3 || information.Length == 0)
+                        if (information.Length == 3)
                         {
                             return information;
                         }
+                        continue;
                     }
                     else
                     {
@@ -84,6 +88,11 @@ namespace Messenger
                 }
                 else
                 {
+                    if (message == "exit")
+                    {
+                        communication.SendMessage("You exit messanger");
+                        return new string[0];
+                    }
                     if (message == "ii")
                     {
                         return await AcceptTheInvitation();

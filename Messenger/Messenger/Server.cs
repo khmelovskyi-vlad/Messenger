@@ -19,14 +19,14 @@ namespace Messenger
             var tcpEndPoint = new IPEndPoint(IPAddress.Any, port);
             tcpSocket.Bind(tcpEndPoint);
             tcpSocket.Listen(5);
-            Run();
+            var k = Run();
             BanerUsers banerUsers = new BanerUsers();
             await banerUsers.BanUser();
         }
         private const int port = 1234;
         private Socket tcpSocket;
         private Messenger messenger = new Messenger();
-        private async void Run()
+        private async Task Run()
         {
             await Task.Run(()=> tcpSocket.BeginAccept(async ar =>
             {
