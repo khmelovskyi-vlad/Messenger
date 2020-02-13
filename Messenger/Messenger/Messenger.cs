@@ -16,8 +16,8 @@ namespace Messenger
         {
 
         }
-        private List<string> online = new List<string>();
-        private object locketOnline = new object();
+        public List<User> online = new List<User>();
+        public object locketOnline = new object();
         private List<string> users;
         private StringBuilder data;
         private byte[] buffer;
@@ -41,18 +41,19 @@ namespace Messenger
                 {
                     return false;
                 }
+                var user = CreateUser(listener, nickname);
                 lock (locketOnline)
                 {
-                    online.Add(nickname);
+                    online.Add(user);
                 }
                 while (true)
                 {
-                    GroupMaster groupMaster = new GroupMaster(listener, nickname);
+                    GroupMaster groupMaster = new GroupMaster(user);
                     var userInformation = await groupMaster.Run();
                     if (userInformation.Length == 3 && userInformation[0] != "")
                     {
-                        await OpenCreateChat(listener, nickname, userInformation);
-                        if (CheckLeftMessanger(listener))
+                        await OpenCreateChat(user, userInformation);
+                        if (CheckLeftMessanger(user))
                         {
                             break;
                         }
@@ -64,25 +65,24 @@ namespace Messenger
                 }
                 lock (locketOnline)
                 {
-                    online.Remove(nickname);
+                    online.Remove(user);
                 }
                 return true;
             }
             return false;
         }
-        private bool CheckLeftMessanger(Socket listener)
+        private bool CheckLeftMessanger(User user)
         {
-            Communication communication = new Communication(listener);
-            communication.SendMessage("If you want left the messanger, write: exit");
-            communication.AnswerClient();
-            if (communication.data.ToString() == "exit")
+            user.communication.SendMessage("If you want left the messanger, write: exit");
+            user.communication.AnswerClient();
+            if (user.communication.data.ToString() == "exit")
             {
-                communication.SendMessage("You left the messanger");
+                user.communication.SendMessage("You left the messanger");
                 return true;
             }
             else
             {
-                communication.SendMessage("Ok, choose new chat");
+                user.communication.SendMessage("Ok, choose new chat");
                 return false;
             }
         }
@@ -90,16 +90,15 @@ namespace Messenger
         {
             foreach (var user in online)
             {
-                if (user == nickname)
+                if (user.Nickname == nickname)
                 {
                     return true;
                 }
             }
             return false;
         }
-        private async Task OpenCreateChat(Socket listener, string nick, string[] information)
+        private async Task OpenCreateChat(User user, string[] information)
         {
-            var user = CreateUser(listener, nick);
             var findChat = false;
             foreach (var chat in chats)
             {

@@ -12,18 +12,13 @@ namespace Messenger
 {
     class CreatorGroups
     {
-        public CreatorGroups(Socket listener, string nickname)
+        public CreatorGroups(User user)
         {
-            this.listener = listener;
-            this.Nickname = nickname;
+            this.user = user;
         }
-        private Socket listener;
         private string PublicGroupsPath { get { return @"D:\temp\messenger\publicGroup"; } }
         private string SecreatGroupsPath { get { return @"D:\temp\messenger\secretGroup"; } }
-        private StringBuilder data;
-        private byte[] buffer;
-        const int size = 256;
-        private string Nickname { get; }
+        private User user;
         const string askForClien = "Who do you want to invite to your group?\n\r" +
                 "If you want to check people, write ?/yes\n\r" +
                 "If you don`t want to add people, write ?/no\n\r";
@@ -36,7 +31,7 @@ namespace Messenger
             while (true)
             {
                 AnswerClient();
-                var typeGroup = data.ToString();
+                var typeGroup = user.communication.data.ToString();
                 if (typeGroup == "sg" || typeGroup == "pg")
                 {
                     return typeGroup;
@@ -51,7 +46,7 @@ namespace Messenger
             while (true)
             {
                 AnswerClient();
-                var groupName = data.ToString();
+                var groupName = user.communication.data.ToString();
                 var findSymdol = false;
                 foreach (var symbol in groupName)
                 {
@@ -108,12 +103,12 @@ namespace Messenger
             while (true)
             {
                 AnswerClient();
-                if (data.ToString() == "?/yes")
+                if (user.communication.data.ToString() == "?/yes")
                 {
                     people = await FindChatsPeople();
                     SendGroups(people, "People:");
                 }
-                else if (data.ToString() == "?/no")
+                else if (user.communication.data.ToString() == "?/no")
                 {
                     if (canCreate)
                     {
@@ -126,7 +121,7 @@ namespace Messenger
                 }
                 else
                 {
-                    var nick = data.ToString();
+                    var nick = user.communication.data.ToString();
                     if (CheckPeople(people, nick))
                     {
                         if (CheckInInvitedList(invitedPeople, nick))
@@ -167,7 +162,7 @@ namespace Messenger
             SendMessage("You create group, thanks.\n\r" +
                 "If you want to open it, write ok, else - press else");
             AnswerClient();
-            if (data.ToString() == "ok")
+            if (user.communication.data.ToString() == "ok")
             {
                 return new string[] { typeGroup, nameGroup, pathGroup };
             }
@@ -228,7 +223,7 @@ namespace Messenger
             using (var stream = File.Open(path, FileMode.Create, FileAccess.Write))
             {
                 var users = new List<string>();
-                users.Add(Nickname);
+                users.Add(user.Nickname);
                 var peopleChatsBeenJson = JsonConvert.SerializeObject(users);
                 var buffer = Encoding.Default.GetBytes(peopleChatsBeenJson);
                 await stream.WriteAsync(buffer, 0, buffer.Length);
@@ -238,11 +233,11 @@ namespace Messenger
         {
             if (typeGroup == "pg")
             {
-                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{Nickname}\userGroups.json", nameGroup, "my group");
+                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, "my group");
             }
             else if (typeGroup == "sg")
             {
-                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{Nickname}\secretGroups.json", nameGroup, "my group");
+                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\secretGroups.json", nameGroup, "my group");
             }
             foreach (var invitedPerson in invitedPeople)
             {
@@ -319,7 +314,7 @@ namespace Messenger
             {
                 foreach (var personJson in allPeopleJson)
                 {
-                    if (personJson.Nickname != Nickname)
+                    if (personJson.Nickname != user.Nickname)
                     {
                         allPeopleWithoutPasswordJsons.Add(personJson.Nickname);
                     }
@@ -349,58 +344,14 @@ namespace Messenger
 
 
 
-
-
-
-
-        AutoResetEvent resetSend = new AutoResetEvent(false);
-        AutoResetEvent resetReceive = new AutoResetEvent(false);
+        
         private void AnswerClient()
         {
-            buffer = new byte[size];
-            data = new StringBuilder();
-            do
-            {
-                listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
-                resetReceive.WaitOne();
-            } while (listener.Available > 0);
-        }
-        private void ReceiveCallback(IAsyncResult AR)
-        {
-            Socket current = (Socket)AR.AsyncState;
-            int received;
-
-            try
-            {
-                received = current.EndReceive(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Client forcefully disconnected");
-                resetReceive.Set();
-                return;
-            }
-            data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-            resetReceive.Set();
+            user.communication.AnswerClient();
         }
         private void SendMessage(string message)
         {
-            byte[] byteData = Encoding.ASCII.GetBytes(message);
-            listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-            resetSend.WaitOne();
-        }
-        private void SendCallback(IAsyncResult AR)
-        {
-            Socket current = (Socket)AR.AsyncState;
-            try
-            {
-                current.EndSend(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Can`t send message");
-            }
-            resetSend.Set();
+            user.communication.SendMessage(message);
         }
     }
 }

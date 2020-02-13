@@ -13,29 +13,42 @@ namespace Messenger
         public Server()
         {
         }
+        public bool Connect = true;
         public async Task Run(int countListener)
         {
             tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             var tcpEndPoint = new IPEndPoint(IPAddress.Any, port);
             tcpSocket.Bind(tcpEndPoint);
             tcpSocket.Listen(5);
-            var k = Run();
-            BanerUsers banerUsers = new BanerUsers();
-            await banerUsers.BanUser();
+            while (true)
+            {
+                await Run();
+                BanerUsers banerUsers = new BanerUsers(messenger, this);
+                await banerUsers.BanUser();
+            }
         }
         private const int port = 1234;
         private Socket tcpSocket;
         private Messenger messenger = new Messenger();
-        private async Task Run()
+        public async Task Run()
         {
             await Task.Run(()=> tcpSocket.BeginAccept(async ar =>
             {
                 try
                 {
-                    var listener = tcpSocket.EndAccept(ar);
-                    Task.Run(() => Run());
-                    var succesConnection = await messenger.Connect(listener);
+                    if (Connect)
+                    {
+                        Task.Run(() => Run());
+                        using (var listener = tcpSocket.EndAccept(ar))
+                        {
+                            var succesConnection = await messenger.Connect(listener);
+                        }
+                    }
 
+                }
+                catch (OperationCanceledException ex)
+                {
+                    Console.WriteLine(ex);
                 }
                 catch (Exception socketException)
                 {

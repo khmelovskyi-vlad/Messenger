@@ -16,12 +16,14 @@ namespace Messenger
         }
         private Socket listener;
         public StringBuilder data;
+        public bool EndTask = false;
         private byte[] buffer;
         const int size = 256;
         AutoResetEvent resetSend = new AutoResetEvent(false);
         AutoResetEvent resetReceive = new AutoResetEvent(false);
         public void AnswerClient(Socket listener)
         {
+            CheckEndTask(listener);
             buffer = new byte[size];
             data = new StringBuilder();
             do
@@ -32,6 +34,7 @@ namespace Messenger
         }
         public void AnswerClient()
         {
+            CheckEndTask(listener);
             buffer = new byte[size];
             data = new StringBuilder();
             do
@@ -69,6 +72,16 @@ namespace Messenger
             byte[] byteData = Encoding.ASCII.GetBytes(message);
             listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
             resetSend.WaitOne();
+        }
+        private void CheckEndTask(Socket listener)
+        {
+            if (EndTask == true)
+            {
+                byte[] byteData = Encoding.ASCII.GetBytes("You are in ban, bye");
+                listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
+                resetSend.WaitOne();
+                throw new OperationCanceledException();
+            }
         }
         private void SendCallback(IAsyncResult AR)
         {

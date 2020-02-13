@@ -10,6 +10,13 @@ namespace Messenger
 {
     class BanerUsers
     {
+        public BanerUsers(Messenger messenger, Server server)
+        {
+            this.messenger = messenger;
+            this.server = server;
+        }
+        Server server;
+        Messenger messenger;
         private const string PublicGroupsPath = @"D:\temp\messenger\publicGroup";
         private const string SecretGroupsPath = @"D:\temp\messenger\secretGroup";
         private const string PeopleChatsPath = @"D:\temp\messenger\peopleChats";
@@ -25,17 +32,67 @@ namespace Messenger
             {
                 Console.WriteLine("If you want to ban the user by the nickname, press n\n\r" +
                     "If you want to ban the user by IP, press i\n\r" +
-                    "If you want to unban IP, press u\n\r");
+                    "If you want to unban the IP, press u\n\r" +
+                    "If you want to stop the server, press s\n\r" +
+                    "If you want to delete all except the port, press d\n\r");
                 var key = Console.ReadKey(true);
-                if (key.Key == ConsoleKey.N || key.Key == ConsoleKey.I)
+                switch (key.Key)
                 {
-                    await Baning(key);
+                    case ConsoleKey.N:
+                        await Baning(key);
+                        break;
+                    case ConsoleKey.I:
+                        await Baning(key);
+                        break;
+                    case ConsoleKey.U:
+                        await Unban();
+                        break;
+                    case ConsoleKey.S:
+                        StopServer();
+                        break;
+                    case ConsoleKey.W:
+                        DeleteAll();
+                        break;
+                    default:
+                        break;
                 }
-                else if (key.Key == ConsoleKey.U)
+
+                //if (key.Key == ConsoleKey.N || key.Key == ConsoleKey.I)
+                //{
+                //    await Baning(key);
+                //}
+                //else if (key.Key == ConsoleKey.U)
+                //{
+                //    await Unban();
+                //}
+                //else if (key.Key == ConsoleKey.S)
+                //{
+                //    StopServer();
+                //}
+                //else if (key.Key == ConsoleKey.W)
+                //{
+                //    DeleteAll();
+                //}
+            }
+        }
+        private void DeleteAll()
+        {
+
+        }
+        private void StopServer()
+        {
+            server.Connect = false;
+            lock (messenger.locketOnline)
+            {
+                foreach (var user in messenger.online)
                 {
-                    await Unban();
+                    user.communication.EndTask = true;
                 }
             }
+            Console.WriteLine("Click something to start the server");
+            Console.ReadKey(true);
+            server.Connect = true;
+            server.Run();
         }
         private async Task Unban()
         {
@@ -126,6 +183,16 @@ namespace Messenger
         }
         private async void BanOnNickname()
         {
+            lock (messenger.locketOnline)
+            {
+                foreach (var user in messenger.online)
+                {
+                    if (user.Nickname == this.user.Nickname)
+                    {
+                        user.communication.EndTask = true;
+                    }
+                }
+            }
             //var userGroups = await ReadData($@"{Users}\{user.Nickname}\userGroups.json");
             //var leavedUserGroups = await ReadData($@"{Users}\{user.Nickname}\leavedUserGroups.json");
             //DeleteData(PublicGroupsPath, userGroups, leavedUserGroups);
@@ -146,7 +213,8 @@ namespace Messenger
             //await DeleteNickInGroups(peopleChatsBeen, PeopleChatsPath, "users.json");
             //await DeleteNickInGroups(leavedPeopleChatsBeen, PeopleChatsPath, "leavedPeople.json");
             await DeleteDate(PeopleChatsPath, $@"{Users}\{user.Nickname}\peopleChatsBeen.json", $@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
-            
+
+            await DeleteInvitations();
             var banUsers = await ReadData(BansNicknames);
             if (banUsers == null)
             {
@@ -159,6 +227,30 @@ namespace Messenger
             }
             await WriteData(BansNicknames, banUsers);
             //Directory.Delete($"{Users}\\{user.Nickname}", true);
+        }
+        private async Task DeleteInvitations()
+        {
+            var invitations = await ReadData($@"{Users}\{user.Nickname}\invitation.json");
+            List<string[]> data = new List<string[]>();
+            foreach (var invitation in invitations)
+            {
+                string path;
+                switch (invitation[0])
+                {
+                    case 'p':
+                        path = $@"{PublicGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+                        break;
+                    case 's':
+                        path = $@"{SecretGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+                        break;
+                    default:
+                        path = "";
+                        break;
+                }
+                var users = await ReadData(path);
+                users.Remove(user.Nickname);
+                await WriteData(path, users);
+            }
         }
         private async Task DeleteDate(string pathTypeGroup, string pathUseGroups, string pathLeavedGroups)
         {
