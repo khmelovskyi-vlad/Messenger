@@ -6,15 +6,96 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Newtonsoft.Json;
 using System.IO;
+using System.Threading;
 
 namespace Messenger
 {
     class Program
     {
         private static int age = 32;
-        
+        public static bool TryTo(string path)
+        {
+            bool result = false;
+            Tuple<AutoResetEvent, FileSystemWatcher> tuple = null;
+
+            while (true)
+            {
+                try
+                {
+                    using (var file = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.Write))
+                    {
+                        var buffer = Encoding.Default.GetBytes("test");
+                        file.Write(buffer, 0, buffer.Length);
+                        result = true;
+                        break;
+                    }
+                }
+                catch (IOException ex)
+                {
+                    // Init only once and only if needed. Prevent against many instantiation in case of multhreaded 
+                    // file access concurrency (if file is frequently accessed by someone else). Better memory usage.
+                    if (tuple == null)
+                    {
+                        var autoResetEvent = new AutoResetEvent(true);
+                        var dir = Path.GetDirectoryName(path);
+                        var fileSystemWatcher = new FileSystemWatcher(dir)
+                        {
+                            EnableRaisingEvents = true
+                        };
+                        fileSystemWatcher.Filter = Path.GetFileName(path);
+                        var secondd = Path.GetFullPath(path);
+                        fileSystemWatcher.Changed +=
+                            (o, e) =>
+                            {
+                                Console.WriteLine(e.Name);
+                                Console.WriteLine(e.FullPath);
+                                var firts = Path.GetFullPath(e.FullPath);
+                                var second = Path.GetFullPath(path);
+                                if (firts == second)
+                                {
+                                    autoResetEvent.Set();
+                                    if (tuple != null && tuple.Item1 != null) // Dispose of resources now (don't wait the GC).
+                                    {
+                                        tuple.Item1.Dispose();
+                                        tuple.Item2.Dispose();
+                                    }
+                                }
+                            };
+
+                        tuple = new Tuple<AutoResetEvent, FileSystemWatcher>(autoResetEvent, fileSystemWatcher);
+                    }
+                    
+
+                    tuple.Item1.WaitOne(-1);
+                }
+            }
+
+            if (tuple != null && tuple.Item1 != null) // Dispose of resources now (don't wait the GC).
+            {
+                tuple.Item1.Dispose();
+                tuple.Item2.Dispose();
+            }
+
+            return result;
+        }
         static async Task<int> Main(string[] args)
         {
+            //TryTo(@"D:\temp\ok3\test2.txt");
+            //Console.WriteLine("next");
+            //Console.ReadKey();
+            //var list = new List<UserNicknameAndPasswordAndIPs>();
+            //list.Add(new UserNicknameAndPasswordAndIPs("1", "2", new List<string> { "3" }));
+            //list.Add(new UserNicknameAndPasswordAndIPs("1", "2", new List<string> { "3" }));
+            //list.Add(new UserNicknameAndPasswordAndIPs("1", "2", new List<string> { "3" }));
+            //FileMaster fileMaster = new FileMaster();
+            //await fileMaster.WriteFile(@"D:\temp\ok3\test.json", list);
+            //var listJson = await fileMaster.ReadFile(@"D:\temp\ok3\test.json");
+            //var newList = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(listJson);
+            //foreach (var data in newList)
+            //{
+            //    Console.WriteLine(data.Nickname);
+            //}
+            //Console.ReadKey();
             //var timeString = DateTime.Now.ToString();
             //StringBuilder stringBuilder = new StringBuilder();
             //foreach (var timeChar in timeString)

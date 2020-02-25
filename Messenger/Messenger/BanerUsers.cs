@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -14,9 +13,12 @@ namespace Messenger
         {
             this.messenger = messenger;
             this.server = server;
+            fileMaster = new FileMaster();
+            userDeleter = new UserDeleter(fileMaster);
         }
-        Server server;
-        Messenger messenger;
+        private FileMaster fileMaster;
+        private Server server;
+        private Messenger messenger;
         private const string PublicGroupsPath = @"D:\temp\messenger\publicGroup";
         private const string SecretGroupsPath = @"D:\temp\messenger\secretGroup";
         private const string PeopleChatsPath = @"D:\temp\messenger\peopleChats";
@@ -26,6 +28,7 @@ namespace Messenger
         private const string BansNicknames = @"D:\temp\messenger\bans\nicknamesBun.json";
         private const string BansIP = @"D:\temp\messenger\bans\IPsBun.json";
         private UserNicknameAndPasswordAndIPs user;
+        private UserDeleter userDeleter;
         public async Task BanUser()
         {
             while (true)
@@ -34,7 +37,8 @@ namespace Messenger
                     "If you want to ban the user by IP, press i\n\r" +
                     "If you want to unban the IP, press u\n\r" +
                     "If you want to stop the server, press s\n\r" +
-                    "If you want to delete all except the port, press d\n\r");
+                    "If you want to delete all except the port, press d\n\r" +
+                    "If you want to delete user, click h\n\r");
                 var key = Console.ReadKey(true);
                 switch (key.Key)
                 {
@@ -52,6 +56,9 @@ namespace Messenger
                         break;
                     case ConsoleKey.W:
                         DeleteAll();
+                        break;
+                    case ConsoleKey.H:
+                        await DeleteUser();
                         break;
                     default:
                         break;
@@ -75,11 +82,55 @@ namespace Messenger
                 //}
             }
         }
+        private async Task DeleteUser()
+        {
+            var foundNick = await FindNeedNick();
+            if (foundNick)
+            {
+                lock (messenger.locketOnline)
+                {
+                    foreach (var user in messenger.online)
+                    {
+                        if (user.Nickname == this.user.Nickname)
+                        {
+                            user.communication.EndTask = true;
+                        }
+                    }
+                }
+                await userDeleter.Run(user.Nickname, false);
+            }
+            else
+            {
+                Console.WriteLine("Don`t have this nickname");
+            }
+        }
         private void DeleteAll()
         {
-
+            StopUsers();
+            DeleteDirectories();
+            server.CreateDirectories();
+            StartServer();
+        }
+        private void DeleteDirectories()
+        {
+            fileMaster.DeleterFolder(@"D:\temp\messenger\bans");
+            fileMaster.DeleterFolder(@"D:\temp\messenger\nicknamesAndPasswords");
+            fileMaster.DeleterFolder(@"D:\temp\messenger\peopleChats");
+            fileMaster.DeleterFolder(@"D:\temp\messenger\publicGroup");
+            fileMaster.DeleterFolder(@"D:\temp\messenger\secretGroup");
+            fileMaster.DeleterFolder(@"D:\temp\messenger\Users");
         }
         private void StopServer()
+        {
+            StopUsers();
+            StartServer();
+        }
+        private void StartServer()
+        {
+            server.Connect = true;
+            server.Run();
+        }
+        private void StopUsers()
         {
             server.Connect = false;
             lock (messenger.locketOnline)
@@ -91,38 +142,39 @@ namespace Messenger
             }
             Console.WriteLine("Click something to start the server");
             Console.ReadKey(true);
-            server.Connect = true;
-            server.Run();
         }
         private async Task Unban()
         {
             Console.WriteLine("Write name IP");
             var IP = Console.ReadLine();
-            var banIPs = await ReadData(BansIP);
-            var haveIP = false;
-            foreach (var banIP in banIPs)
+            await fileMaster.ReadWrite(BansIP, (banIPs) =>
             {
-                if (banIP == IP)
+                var haveIP = false;
+                foreach (var banIP in banIPs)
                 {
-                    haveIP = true;
-                    break;
+                    if (banIP == IP)
+                    {
+                        haveIP = true;
+                        break;
+                    }
                 }
-            }
-            if (haveIP)
-            {
-                banIPs.Remove(IP);
-                await WriteData(BansIP, banIPs);
-            }
-            else
-            {
-                Console.WriteLine("Don`t have this IP in ban list");
-            }
+                if (haveIP)
+                {
+                    banIPs.Remove(IP);
+                    return (banIPs, true);
+                }
+                else
+                {
+                    Console.WriteLine("Don`t have this IP in ban list");
+                }
+                return (banIPs, false);
+            });
         }
         private async Task Baning(ConsoleKeyInfo key)
         {
             //////////////////////can delete file in user, users and leave users in group
-            user = await FindNeedNick();
-            if (!user.Equals(new UserNicknameAndPasswordAndIPs())) /////////////////////////////////can be mistake
+            var foundNick = await FindNeedNick();
+            if (foundNick) /////////////////////////////////can be mistake
             {
                 if (await CheckBans())
                 {
@@ -147,7 +199,7 @@ namespace Messenger
         }
         private async Task<bool> CheckBans()
         {
-            var banUsers = await ReadData(BansNicknames);
+            var banUsers = await fileMaster.ReadAndDesToLString(BansNicknames);
             if (banUsers == null)
             {
                 return true;
@@ -161,7 +213,7 @@ namespace Messenger
             }
             return true;
         }
-        private async Task<UserNicknameAndPasswordAndIPs> FindNeedNick()
+        private async Task<bool> FindNeedNick()
         {
             Console.WriteLine("Write nickname");
             var line = Console.ReadLine();
@@ -170,16 +222,18 @@ namespace Messenger
         private async void BanOnIP()
         {
             BanOnNickname();
-            var banIPs = await ReadData(BansIP);
-            if (banIPs == null)
+            await fileMaster.ReadWrite(BansIP, (banIPs) =>
             {
-                banIPs = new List<string>();
-            }
-            foreach (var userIP in user.IPs)
-            {
-                banIPs.Add(userIP);
-            }
-            await WriteData(BansIP, banIPs);
+                if (banIPs == null)
+                {
+                    banIPs = new List<string>();
+                }
+                foreach (var userIP in user.IPs)
+                {
+                    banIPs.Add(userIP);
+                }
+                return (banIPs, true);
+            });
         }
         private async void BanOnNickname()
         {
@@ -193,187 +247,193 @@ namespace Messenger
                     }
                 }
             }
-            //var userGroups = await ReadData($@"{Users}\{user.Nickname}\userGroups.json");
-            //var leavedUserGroups = await ReadData($@"{Users}\{user.Nickname}\leavedUserGroups.json");
-            //DeleteData(PublicGroupsPath, userGroups, leavedUserGroups);
-            //await DeleteNickInGroups(userGroups, PublicGroupsPath, "users.json");
-            //await DeleteNickInGroups(leavedUserGroups, PublicGroupsPath, "leavedPeople.json");
-            await DeleteDate(PublicGroupsPath, $@"{Users}\{user.Nickname}\userGroups.json", $@"{Users}\{user.Nickname}\leavedUserGroups.json");
+            await userDeleter.Run(user.Nickname, true);
 
-            //var secretGroups = await ReadData($@"{Users}\{user.Nickname}\secretGroups.json");
-            //var leavedSecretGroups = await ReadData($@"{Users}\{user.Nickname}\leavedSecretGroups.json");
-            //DeleteData(SecretGroupsPath, secretGroups, leavedSecretGroups);
-            //await DeleteNickInGroups(secretGroups, SecretGroupsPath, "users.json");
-            //await DeleteNickInGroups(secretGroups, SecretGroupsPath, "leavedPeople.json");
-            await DeleteDate(SecretGroupsPath, $@"{Users}\{user.Nickname}\secretGroups.json", $@"{Users}\{user.Nickname}\leavedSecretGroups.json");
+            ////var userGroups = await ReadData($@"{Users}\{user.Nickname}\userGroups.json");
+            ////var leavedUserGroups = await ReadData($@"{Users}\{user.Nickname}\leavedUserGroups.json");
+            ////DeleteData(PublicGroupsPath, userGroups, leavedUserGroups);
+            ////await DeleteNickInGroups(userGroups, PublicGroupsPath, "users.json");
+            ////await DeleteNickInGroups(leavedUserGroups, PublicGroupsPath, "leavedPeople.json");
+            //await DeleteData(PublicGroupsPath, $@"{Users}\{user.Nickname}\userGroups.json", $@"{Users}\{user.Nickname}\leavedUserGroups.json");
 
-            //var peopleChatsBeen = await ReadData($@"{Users}\{user.Nickname}\peopleChatsBeen.json");
-            //var leavedPeopleChatsBeen = await ReadData($@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
-            //DeleteData(PeopleChatsPath, peopleChatsBeen, leavedPeopleChatsBeen);
-            //await DeleteNickInGroups(peopleChatsBeen, PeopleChatsPath, "users.json");
-            //await DeleteNickInGroups(leavedPeopleChatsBeen, PeopleChatsPath, "leavedPeople.json");
-            await DeleteDate(PeopleChatsPath, $@"{Users}\{user.Nickname}\peopleChatsBeen.json", $@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
+            ////var secretGroups = await ReadData($@"{Users}\{user.Nickname}\secretGroups.json");
+            ////var leavedSecretGroups = await ReadData($@"{Users}\{user.Nickname}\leavedSecretGroups.json");
+            ////DeleteData(SecretGroupsPath, secretGroups, leavedSecretGroups);
+            ////await DeleteNickInGroups(secretGroups, SecretGroupsPath, "users.json");
+            ////await DeleteNickInGroups(secretGroups, SecretGroupsPath, "leavedPeople.json");
+            //await DeleteData(SecretGroupsPath, $@"{Users}\{user.Nickname}\secretGroups.json", $@"{Users}\{user.Nickname}\leavedSecretGroups.json");
 
-            await DeleteInvitations();
-            var banUsers = await ReadData(BansNicknames);
-            if (banUsers == null)
+            ////var peopleChatsBeen = await ReadData($@"{Users}\{user.Nickname}\peopleChatsBeen.json");
+            ////var leavedPeopleChatsBeen = await ReadData($@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
+            ////DeleteData(PeopleChatsPath, peopleChatsBeen, leavedPeopleChatsBeen);
+            ////await DeleteNickInGroups(peopleChatsBeen, PeopleChatsPath, "users.json");
+            ////await DeleteNickInGroups(leavedPeopleChatsBeen, PeopleChatsPath, "leavedPeople.json");
+            //await DeleteData(PeopleChatsPath, $@"{Users}\{user.Nickname}\peopleChatsBeen.json", $@"{Users}\{user.Nickname}\leavedPeopleChatsBeen.json");
+
+            //await DeleteInvitations();
+
+            await fileMaster.ReadWrite(BansNicknames, (banUsers) =>
             {
-                banUsers = new List<string>();
+                if (banUsers == null)
+                {
+                    banUsers = new List<string>();
+                }
                 banUsers.Add(user.Nickname);
-            }
-            else
-            {
-                banUsers.Add(user.Nickname);
-            }
-            await WriteData(BansNicknames, banUsers);
+                return (banUsers, true);
+            });
             //Directory.Delete($"{Users}\\{user.Nickname}", true);
         }
-        private async Task DeleteInvitations()
-        {
-            var invitations = await ReadData($@"{Users}\{user.Nickname}\invitation.json");
-            List<string[]> data = new List<string[]>();
-            foreach (var invitation in invitations)
-            {
-                string path;
-                switch (invitation[0])
-                {
-                    case 'p':
-                        path = $@"{PublicGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
-                        break;
-                    case 's':
-                        path = $@"{SecretGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
-                        break;
-                    default:
-                        path = "";
-                        break;
-                }
-                var users = await ReadData(path);
-                users.Remove(user.Nickname);
-                await WriteData(path, users);
-            }
-        }
-        private async Task DeleteDate(string pathTypeGroup, string pathUseGroups, string pathLeavedGroups)
-        {
-            var groups = await ReadData(pathUseGroups);
-            var leavedGroups = await ReadData(pathLeavedGroups);
-            DeleteData(pathTypeGroup, groups, leavedGroups);
-            await DeleteNickInGroups(groups, pathTypeGroup, "users.json");
-            await DeleteNickInGroups(leavedGroups, pathTypeGroup, "leavedPeople.json");
-        }
-        private async Task DeleteNickInGroups(List<string> groupNames, string firstPartOfThePast, string lastPartOfThePast)
-        {
-            if (groupNames != null)
-            {
-                foreach (var groupName in groupNames)
-                {
-                    var path = $"{firstPartOfThePast}\\{groupName}\\{lastPartOfThePast}";
-                    var users = await ReadData(path);
-                    users.Remove(user.Nickname);
-                    await WriteData(path, users);
-                }
-            }
-        }
-        private async void DeleteData(string path, List<string> firstGroups, List<string> SecondGroups)
-        {
-            if (firstGroups != null)
-            {
-                var firstGroupsPaths = firstGroups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
-                foreach (var firstGroupPath in firstGroupsPaths)
-                {
-                    await ReadWriteData(firstGroupPath);
-                }
-            }
-            if (SecondGroups != null)
-            {
-                var SecondGroupsPaths = SecondGroups.Select(x => $@"{path}\{x}\data.json");
-                foreach (var SecondGroupPath in SecondGroupsPaths)
-                {
-                    await ReadWriteData(SecondGroupPath);
-                }
-            }
-        }
-
-        //private List<string> ReadGroups(string path)
+        //private async Task DeleteInvitations()
         //{
-        //    var groupsPaths = Directory.GetDirectories(path);
-        //    var groups = new List<string>();
-        //    foreach (var groupPath in groupsPaths)
+        //    var invitations = await fileMaster.ReadAndDesToLString($@"{Users}\{user.Nickname}\invitation.json");
+        //    if (invitations != null)
         //    {
-        //        groups.Add(Path.GetFileName(groupPath));
+        //        foreach (var invitation in invitations)
+        //        {
+        //            string path;
+        //            switch (invitation[0])
+        //            {
+        //                case 'p':
+        //                    path = $@"{PublicGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+        //                    break;
+        //                case 's':
+        //                    path = $@"{SecretGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+        //                    break;
+        //                default:
+        //                    path = "";
+        //                    break;
+        //            }
+        //            await fileMaster.ReadWrite(path, (users) =>
+        //            {
+        //                users.Remove(user.Nickname);
+        //                return (users, true);
+        //            });
+        //        }
         //    }
-        //    return groups;
         //}
-        private async Task ReadWriteData(string path)
-        {
-            var messages = await ReadData(path);
-            if (messages == null)
-            {
-                return;
-            }
-            var newMessages = new List<string>();
-            foreach (var message in messages)
-            {
-                if (user.Nickname == message.Remove(user.Nickname.Length))
-                {
-                    newMessages.Add($"{user.Nickname} was banned");
-                    continue;
-                }
-                newMessages.Add(message);
-            }
-            await WriteData(path, newMessages);
-        }
-        private async Task WriteData(string path, List<string> data)
-        {
-            using (var stream = new StreamWriter(path, false))
-            {
-                var dataJson = JsonConvert.SerializeObject(data);
-                await stream.WriteAsync(dataJson);
-            }
+        //private async Task DeleteData(string pathTypeGroup, string pathUseGroups, string pathLeavedGroups)
+        //{
+        //    var groups = await fileMaster.ReadAndDesToLString(pathUseGroups);
+        //    var leavedGroups = await fileMaster.ReadAndDesToLString(pathLeavedGroups);
+        //    await ChangeMessages(pathTypeGroup, groups, leavedGroups);
+        //    await DeleteNickInGroups(groups, pathTypeGroup, "users.json");
+        //    await DeleteNickInGroups(leavedGroups, pathTypeGroup, "leavedPeople.json");
+        //}
+        //private async Task DeleteNickInGroups(List<string> groupNames, string firstPartOfThePast, string lastPartOfThePast)
+        //{
+        //    if (groupNames != null)
+        //    {
+        //        foreach (var groupName in groupNames)
+        //        {
+        //            var path = $"{firstPartOfThePast}\\{groupName}\\{lastPartOfThePast}";
+        //            await fileMaster.ReadWrite(path, (users) => 
+        //            { 
+        //                users.Remove(user.Nickname);
+        //                return (users, true);
+        //            });
+        //        }
+        //    }
+        //}
+        //private async Task ChangeMessages(string path, List<string> firstGroups, List<string> secondGroups)
+        //{
+        //    await ChangeMessages(path, firstGroups);
+        //    await ChangeMessages(path, secondGroups);
+        //    //if (firstGroups != null)
+        //    //{
+        //    //    var firstGroupsPaths = firstGroups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
+        //    //    foreach (var firstGroupPath in firstGroupsPaths)
+        //    //    {
+        //    //        await ReadWriteData(firstGroupPath);
+        //    //    }
+        //    //}
+        //    //if (secondGroups != null)
+        //    //{
+        //    //    var SecondGroupsPaths = secondGroups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
+        //    //    foreach (var SecondGroupPath in SecondGroupsPaths)
+        //    //    {
+        //    //        await ReadWriteData(SecondGroupPath);
+        //    //    }
+        //    //}
+        //}
+        //private async Task ChangeMessages(string path, List<string> groups)
+        //{
+        //    if (groups != null)
+        //    {
+        //        var SecondGroupsPaths = groups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
+        //        foreach (var SecondGroupPath in groups)
+        //        {
+        //            await ReadWriteData(SecondGroupPath);
+        //        }
+        //    }
+        //}
 
-        }
-        private async Task<UserNicknameAndPasswordAndIPs> CheckNickname(string nickname)
+        ////private List<string> ReadGroups(string path)
+        ////{
+        ////    var groupsPaths = Directory.GetDirectories(path);
+        ////    var groups = new List<string>();
+        ////    foreach (var groupPath in groupsPaths)
+        ////    {
+        ////        groups.Add(Path.GetFileName(groupPath));
+        ////    }
+        ////    return groups;
+        ////}
+        //private async Task ReadWriteData(string path)
+        //{
+        //    //var messages = await fileMaster.ReadAndDesToLString(path);
+        //    await fileMaster.ReadWrite(path, (messages) =>
+        //    {
+        //        var newMessages = new List<string>();
+        //        if (messages != null)
+        //        {
+        //            foreach (var message in messages)
+        //            {
+        //                if (user.Nickname == message.Remove(user.Nickname.Length))
+        //                {
+        //                    newMessages.Add($"{user.Nickname} was banned");
+        //                    continue;
+        //                }
+        //                newMessages.Add(message);
+        //            }
+        //        }
+        //        return (newMessages, true);
+        //    });
+        //}
+        private async Task<bool> CheckNickname(string nickname)
         {
-            var users = await ReadUsersData();
-            foreach (var user in users)
+            return await fileMaster.ReadWrite(NicknamesAndPasswordsPath, users =>
             {
-                if (nickname == user.Nickname)
+                var findUser = false;
+                foreach (var user in users)
                 {
-                    return user;
+                    if (nickname == user.Nickname)
+                    {
+                        findUser = true;
+                        this.user = user;
+                        break;
+                    }
                 }
-            }
-            return new UserNicknameAndPasswordAndIPs();
-        }
-        private async Task<List<string>> ReadData(string path)
-        {
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                return JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
-        }
-        private async Task<List<UserNicknameAndPasswordAndIPs>> ReadUsersData()
-        {
-            using (var stream = File.Open(NicknamesAndPasswordsPath, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-            }
-        }
-        private async Task<StringBuilder> ReadFile(FileStream stream)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            var buffer = 256;
-            var arrayBytes = new byte[buffer];
-            while (true)
-            {
-                var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
-                usersJson.Append(Encoding.Default.GetString(arrayBytes, 0, readedRealBytes));
-                if (readedRealBytes < buffer)
+                if (findUser)
                 {
-                    break;
+                    users.Remove(user);
                 }
-            }
-            return usersJson;
+                return (users, true);
+            });
+            //var users = await fileMaster.ReadAndDesToLUserInf(NicknamesAndPasswordsPath);
+            //var findUser = false;
+            //foreach (var user in users)
+            //{
+            //    if (nickname == user.Nickname)
+            //    {
+            //        findUser = true;
+            //        this.user = user;
+            //        break;
+            //    }
+            //}
+            //if (findUser)
+            //{
+            //    users.Remove(user);
+            //}
+            //return findUser;
         }
     }
 }

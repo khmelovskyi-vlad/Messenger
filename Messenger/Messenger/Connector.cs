@@ -1,7 +1,6 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using System.Net; //////////////////////////only for IP, need this?
 using System.Net.Sockets;
@@ -19,6 +18,7 @@ namespace Messenger
             IP = ((IPEndPoint)listener.RemoteEndPoint).Address.ToString();
             communication = new Communication(listener);
         }
+        FileMaster fileMaster = new FileMaster();
         private string IP { get; }
         private Socket listener { get; }
         private Communication communication;
@@ -27,14 +27,9 @@ namespace Messenger
         private string nickname = "";
         private async Task<bool> CheckNicknamesBan(string nick)
         {
-            using (var stream = File.Open(@"D:\temp\messenger\bans\nicknamesBun.json", FileMode.OpenOrCreate, FileAccess.Read))
+            var nicksBan = await fileMaster.ReadAndDesToLString(@"D:\temp\messenger\bans\nicknamesBun.json");
+            if (nicksBan != null)
             {
-                var nicksBanJson = await AddFileToSB(stream);
-                var nicksBan = JsonConvert.DeserializeObject<List<string>>(nicksBanJson.ToString());
-                if (nicksBan == null)
-                {
-                    return false;
-                }
                 foreach (var nickBan in nicksBan)
                 {
                     if (nick == nickBan)
@@ -47,14 +42,9 @@ namespace Messenger
         }
         private async Task<bool> CheckIPsBan()
         {
-            using (var stream = File.Open(@"D:\temp\messenger\bans\IPsBun.json", FileMode.OpenOrCreate, FileAccess.Read))
+            var IPsBan = await fileMaster.ReadAndDesToLString(@"D:\temp\messenger\bans\IPsBun.json");
+            if (IPsBan != null)
             {
-                var IPsBanJson = await AddFileToSB(stream);
-                var IPsBan = JsonConvert.DeserializeObject<List<string>>(IPsBanJson.ToString());
-                if (IPsBan == null)
-                {
-                    return false;
-                }
                 foreach (var IPBan in IPsBan)
                 {
                     if (IP == IPBan)
@@ -70,19 +60,20 @@ namespace Messenger
         //{
         //    communication.AnswerClient(listener);
         //}
-        private async void CreateFolderAndFile(UserNicknameAndPasswordAndIPs userNicknameAndPassword)
-        {
-            Directory.CreateDirectory($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
-            using (var stream = File.Open($@"{UserFoldersPath}\{userNicknameAndPassword.Nickname}\Data.json", FileMode.Create, FileAccess.Write))
-            {
-                var arrayBytes = Encoding.Default.GetBytes(userNicknameAndPassword.Password);
-                await stream.WriteAsync(arrayBytes, 0, arrayBytes.Length);
-            }
-        }
-        private void DeleterFolder(string nick)
-        {
-            Directory.Delete($"{UserFoldersPath}\\{nick}", true);
-        }
+        //private void CreateFolderAndFile(UserNicknameAndPasswordAndIPs userNicknameAndPassword)
+        //{
+        //    fileMaster.CreateFolderAndFile($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
+        //    //Directory.CreateDirectory($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
+        //    //using (var stream = File.Open($@"{UserFoldersPath}\{userNicknameAndPassword.Nickname}\Data.json", FileMode.Create, FileAccess.Write))
+        //    //{
+        //    //    var arrayBytes = Encoding.Default.GetBytes(userNicknameAndPassword.Password);
+        //    //    await stream.WriteAsync(arrayBytes, 0, arrayBytes.Length);
+        //    //}
+        //}
+        //private void DeleterFolder(string nick)
+        //{
+        //    Directory.Delete($"{UserFoldersPath}\\{nick}", true);
+        //}
         public async Task<string> Run()
         {
             if (await CheckIPsBan())
@@ -142,41 +133,65 @@ namespace Messenger
                 return false;
             }
             StringBuilder usersJson;
-            string userDataJson;
             communication.SendMessage("Do you realy want, delete your accaunt? if yes, click Enter");
             communication.AnswerClient();
             if (communication.data.ToString() != "Yes")
             {
                 return false;
             }
-            using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            var result = await fileMaster.ReadWrite(FilePath, oldData =>
             {
-                usersJson = await AddFileToSB(stream);
-                var oldData = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
                 if (oldData == null)
                 {
                     communication.SendMessage("Don`t have your data");
-                    return false;
+                    return (oldData, false);
                 }
                 else
                 {
                     if (!LastFindData(oldData, userNicknameAndPassword.Nickname))
                     {
-                        return false;
+                        return (oldData, false);
                     }
                     oldData.Remove(userNicknameAndPassword);
-                    userDataJson = JsonConvert.SerializeObject(oldData);
                 }
-            }
-            using (FileStream stream = File.Open(FilePath, FileMode.Truncate, FileAccess.Write))
+                return (oldData, true);
+            });
+            if (result)
             {
-                byte[] arrayBytes = Encoding.Default.GetBytes(userDataJson);
-                stream.Seek(0, SeekOrigin.Begin);
-                stream.Write(arrayBytes, 0, arrayBytes.Length);
                 communication.SendMessage("Index was deleter");
-                DeleterFolder(userNicknameAndPassword.Nickname);
-                return true; //////////////////////////////////////////////////////////////////////think must be false
+                UserDeleter userDeleter = new UserDeleter(fileMaster);
+                await userDeleter.Run(userNicknameAndPassword.Nickname, false);
+                //fileMaster.DeleterFolder($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
             }
+            return result;
+            //using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            //{
+            //    usersJson = await AddFileToSB(stream);
+            //    var oldData = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+            //    if (oldData == null)
+            //    {
+            //        communication.SendMessage("Don`t have your data");
+            //        return false;
+            //    }
+            //    else
+            //    {
+            //        if (!LastFindData(oldData, userNicknameAndPassword.Nickname))
+            //        {
+            //            return false;
+            //        }
+            //        oldData.Remove(userNicknameAndPassword);
+            //        userDataJson = JsonConvert.SerializeObject(oldData);
+            //    }
+            //}
+            //using (FileStream stream = File.Open(FilePath, FileMode.Truncate, FileAccess.Write))
+            //{
+            //    byte[] arrayBytes = Encoding.Default.GetBytes(userDataJson);
+            //    stream.Seek(0, SeekOrigin.Begin);
+            //    stream.Write(arrayBytes, 0, arrayBytes.Length);
+            //    communication.SendMessage("Index was deleter");
+            //    fileMaster.DeleterFolder($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
+            //    return true; //////////////////////////////////////////////////////////////////////think must be false
+            //}
         }
         private bool LastFindData(IEnumerable<UserNicknameAndPasswordAndIPs> usersData, string nick)
         {
@@ -230,7 +245,7 @@ namespace Messenger
                     var successSaveData = await EnterPasswordAndSaveData();
                     if (!successSaveData)
                     {
-                        ConnectNewUserToOlds(userData);
+                        await ConnectNewUserToOlds(userData);
                         //await ConnectNewUserToOlds(userData);
                     }
                     return true;
@@ -401,29 +416,45 @@ namespace Messenger
             }
             if (!haveIP)
             {
-                List<UserNicknameAndPasswordAndIPs> users;
-                using (var stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.Read))
+                await fileMaster.ReadWrite(FilePath, users =>
                 {
-                    var usersJson = await AddFileToSB(stream);
-                    users = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-                }
-                UserNicknameAndPasswordAndIPs userWithNewIP = new UserNicknameAndPasswordAndIPs();
-                foreach (var user in users)
-                {
-                    if (user.Nickname == userNicknameAndPasswordAndIPs.Nickname)
+                    UserNicknameAndPasswordAndIPs userWithNewIP = new UserNicknameAndPasswordAndIPs();
+                    foreach (var user in users)
                     {
-                        userWithNewIP = user;
-                        break;
+                        if (user.Nickname == userNicknameAndPasswordAndIPs.Nickname)
+                        {
+                            userWithNewIP = user;
+                            break;
+                        }
                     }
-                }
-                users.Remove(userWithNewIP);
-                userWithNewIP.IPs.Add(IP);
-                users.Add(userWithNewIP);
-                using (var stream = new StreamWriter(FilePath, false))
-                {
-                    var usersJson = JsonConvert.SerializeObject(users);
-                    await stream.WriteAsync(usersJson);
-                }
+                    users.Remove(userWithNewIP);
+                    userWithNewIP.IPs.Add(IP);
+                    users.Add(userWithNewIP);
+                    return (users, true);
+                });
+                //List<UserNicknameAndPasswordAndIPs> users;
+                //using (var stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.Read))
+                //{
+                //    var usersJson = await AddFileToSB(stream);
+                //    users = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+                //}
+                //UserNicknameAndPasswordAndIPs userWithNewIP = new UserNicknameAndPasswordAndIPs();
+                //foreach (var user in users)
+                //{
+                //    if (user.Nickname == userNicknameAndPasswordAndIPs.Nickname)
+                //    {
+                //        userWithNewIP = user;
+                //        break;
+                //    }
+                //}
+                //users.Remove(userWithNewIP);
+                //userWithNewIP.IPs.Add(IP);
+                //users.Add(userWithNewIP);
+                //using (var stream = new StreamWriter(FilePath, false))
+                //{
+                //    var usersJson = JsonConvert.SerializeObject(users);
+                //    await stream.WriteAsync(usersJson);
+                //}
             }
         }
         private void AnswerAndCheckDisconect()
@@ -472,65 +503,89 @@ namespace Messenger
         }
         private async Task<IEnumerable<UserNicknameAndPasswordAndIPs>> TakeAllUserData()
         {
-            StringBuilder usersJson;
-            using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                usersJson = await AddFileToSB(stream);
-            }
-            return JsonConvert.DeserializeObject<IEnumerable<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+            return await fileMaster.ReadAndDesToLUserInf(FilePath);
+            //StringBuilder usersJson;
+            //using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.Read))
+            //{
+            //    usersJson = await AddFileToSB(stream);
+            //}
+            //return JsonConvert.DeserializeObject<IEnumerable<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
         }
-        private async Task<StringBuilder> AddFileToSB(FileStream stream)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            var buffer = 256;
-            var position = stream.Seek(0, SeekOrigin.Begin);
-            byte[] arrayBytes = new byte[buffer];
-            while (true)
-            {
-                var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
-                var stringArrayBytes = Encoding.Default.GetString(arrayBytes, 0, readedRealBytes);
-                usersJson.Append(stringArrayBytes);
-                if (readedRealBytes < buffer)
-                {
-                    break;
-                }
-            }
-            return usersJson;
-        }
+        //private async Task<StringBuilder> AddFileToSB(FileStream stream)
+        //{
+        //    StringBuilder usersJson = new StringBuilder();
+        //    var buffer = 256;
+        //    var position = stream.Seek(0, SeekOrigin.Begin);
+        //    byte[] arrayBytes = new byte[buffer];
+        //    while (true)
+        //    {
+        //        var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
+        //        var stringArrayBytes = Encoding.Default.GetString(arrayBytes, 0, readedRealBytes);
+        //        usersJson.Append(stringArrayBytes);
+        //        if (readedRealBytes < buffer)
+        //        {
+        //            break;
+        //        }
+        //    }
+        //    return usersJson;
+        //}
         private async Task<bool> AddNewUser(IEnumerable<string> userData)
         {
             var IPs = new List<string>();
             IPs.Add(IP);
             //var IP = listener.RemoteEndPoint.ToString();                                          //////////////maybe something else
             UserNicknameAndPasswordAndIPs userNicknameAndPassword = new UserNicknameAndPasswordAndIPs(userData.First(), userData.Last(), IPs);
-            using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            var result = await fileMaster.ReadWrite(FilePath, oldData =>
             {
-                StringBuilder usersJson = await AddFileToSB(stream);
-                var oldData = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-                string userDataJson;
                 if (oldData == null)
                 {
-                    List<UserNicknameAndPasswordAndIPs> userNicknameAndPasswordList = new List<UserNicknameAndPasswordAndIPs>();
-                    userNicknameAndPasswordList.Add(userNicknameAndPassword);
-                    userDataJson = JsonConvert.SerializeObject(userNicknameAndPasswordList);
+                    oldData = new List<UserNicknameAndPasswordAndIPs>();
                 }
                 else
                 {
                     if (!LastCheck(oldData, userNicknameAndPassword.Nickname))
                     {
-                        return false;
+                        return (oldData, false);
                     }
-                    oldData.Add(userNicknameAndPassword);
-                    userDataJson = JsonConvert.SerializeObject(oldData);
                 }
-                byte[] arrayBytes = Encoding.Default.GetBytes(userDataJson);
-                stream.Seek(0, SeekOrigin.Begin);
+                oldData.Add(userNicknameAndPassword);
+                return (oldData, true);
+            });
+            if (result)
+            {
                 communication.SendMessage("You enter to messenger");
-                stream.Write(arrayBytes, 0, arrayBytes.Length);
-                CreateFolderAndFile(userNicknameAndPassword);
+                fileMaster.CreateDirectory($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
                 nickname = userNicknameAndPassword.Nickname;
-                return true;
             }
+            return result;
+            //using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            //{
+            //    StringBuilder usersJson = await AddFileToSB(stream);
+            //    var oldData = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+            //    string userDataJson;
+            //    if (oldData == null)
+            //    {
+            //        List<UserNicknameAndPasswordAndIPs> userNicknameAndPasswordList = new List<UserNicknameAndPasswordAndIPs>();
+            //        userNicknameAndPasswordList.Add(userNicknameAndPassword);
+            //        userDataJson = JsonConvert.SerializeObject(userNicknameAndPasswordList);
+            //    }
+            //    else
+            //    {
+            //        if (!LastCheck(oldData, userNicknameAndPassword.Nickname))
+            //        {
+            //            return false;
+            //        }
+            //        oldData.Add(userNicknameAndPassword);
+            //        userDataJson = JsonConvert.SerializeObject(oldData);
+            //    }
+            //    byte[] arrayBytes = Encoding.Default.GetBytes(userDataJson);
+            //    stream.Seek(0, SeekOrigin.Begin);
+            //    communication.SendMessage("You enter to messenger");
+            //    stream.Write(arrayBytes, 0, arrayBytes.Length);
+            //    fileMaster.CreateFolderAndFile($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
+            //    nickname = userNicknameAndPassword.Nickname;
+            //    return true;
+            //}
         }
         private bool LastCheck(IEnumerable<UserNicknameAndPasswordAndIPs> usersData, string nick)
         {
@@ -538,8 +593,7 @@ namespace Messenger
             {
                 if (nick == userData.Nickname)
                 {
-                    communication.SendMessage("This nickname is currently in use, enter new please");
-                    communication.SendMessage("Enter a nickname that does not begin with '?'");
+                    communication.SendMessage("This nickname is currently in use, enter new please\n\rEnter new nickname");
                     return false;
                 }
             }

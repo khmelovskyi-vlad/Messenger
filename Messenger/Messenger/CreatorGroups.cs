@@ -23,7 +23,7 @@ namespace Messenger
                 "If you want to check people, write ?/yes\n\r" +
                 "If you don`t want to add people, write ?/no\n\r";
 
-
+        FileMaster fileMaster = new FileMaster();
         private string SelectTypeGroup()
         {
             SendMessage("What type of group do you want?\n\r" +
@@ -76,15 +76,15 @@ namespace Messenger
             string[] groups;
             if (typeGroup == "pg")
             {
-                groups = Directory.GetDirectories(@"D:\temp\messenger\publicGroup");
+                groups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup");
             }
             else
             {
-                groups = Directory.GetDirectories(@"D:\temp\messenger\secretGroup");
+                groups = fileMaster.GetDirectories(@"D:\temp\messenger\secretGroup");
             }
             foreach (var group in groups)
             {
-                var groupWithoutPath = Path.GetFileName(group);
+                var groupWithoutPath = fileMaster.GetFileName(group);
                 if (nameGroup == groupWithoutPath)
                 {
                     return false;
@@ -203,7 +203,7 @@ namespace Messenger
             //}
             //Directory.CreateDirectory($"{directoryName}{normalTime}");
             var pathGroup = directoryName.ToString();
-            Directory.CreateDirectory(pathGroup);
+            fileMaster.CreateDirectory(pathGroup);
             AddUser($"{pathGroup}\\users.json");
             await WriteInvite($"{pathGroup}\\invitation.json", invitedPeople);
             return pathGroup;
@@ -246,10 +246,8 @@ namespace Messenger
         }
         private async void ReadWriteInvitationOrGroup(string path, string nameGroup, string typeGroup)
         {
-            using (var stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite(path, usersInvitation =>
             {
-                var usersJson = await ReadFile(stream);
-                var usersInvitation = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
                 if (usersInvitation == null)
                 {
                     usersInvitation = new List<string>();
@@ -258,7 +256,7 @@ namespace Messenger
                 {
                     usersInvitation.Add($"public: {nameGroup}");
                 }
-                else if(typeGroup == "sg")
+                else if (typeGroup == "sg")
                 {
                     usersInvitation.Add($"secret: {nameGroup}");
                 }
@@ -266,27 +264,8 @@ namespace Messenger
                 {
                     usersInvitation.Add(nameGroup);
                 }
-                var usersInvitationJson = JsonConvert.SerializeObject(usersInvitation);
-                var buffer = Encoding.Default.GetBytes(usersInvitationJson);
-                stream.Seek(0, SeekOrigin.Begin);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
-        private async Task<StringBuilder> ReadFile(FileStream stream)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            var buffer = 256;
-            var arrayBytes = new byte[buffer];
-            while (true)
-            {
-                var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
-                usersJson.Append(Encoding.Default.GetString(arrayBytes, 0, readedRealBytes));
-                if (readedRealBytes < buffer)
-                {
-                    break;
-                }
-            }
-            return usersJson;
+                return (usersInvitation, true);
+            });
         }
         private void SendGroups(IEnumerable<string> groups, string firstMassage)
         {
@@ -308,7 +287,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindChatsPeople()
         {
-            var allPeopleJson = (List<UserNicknameAndPasswordAndIPs>)await ReadFileToList($@"D:\temp\messenger\nicknamesAndPasswords\users.json", false);
+            var allPeopleJson = await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json");
             var allPeopleWithoutPasswordJsons = new List<string>();
             if (allPeopleJson != null)
             {
@@ -321,22 +300,6 @@ namespace Messenger
                 }
             }
             return allPeopleWithoutPasswordJsons;
-        }
-        private async Task<object> ReadFileToList(string path, bool toString)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                usersJson = await ReadFile(stream);
-            }
-            if (toString)
-            {
-                return JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
-            else
-            {
-                return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-            }
         }
 
 

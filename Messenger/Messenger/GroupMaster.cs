@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
-using System.IO;
+//using System.IO;
 using System.Linq;
 using System.Net.Sockets;
 using System.Text;
@@ -20,6 +20,7 @@ namespace Messenger
         private string PublicGroupsPath { get { return @"D:\temp\messenger\publicGroup"; } }
         private string SecreatGroupsPath { get { return @"D:\temp\messenger\secretGroup"; } }
         private string PeopleChatsPath { get { return @"D:\temp\messenger\peopleChats"; } }
+        FileMaster fileMaster = new FileMaster();
         public async Task<string[]> Run()
         {
             var enteringChats = await FindAllChats();
@@ -105,17 +106,24 @@ namespace Messenger
         {
             string nameGroup;
             string pathGroup;
-            string[] pathAndNAme;
-            SendMessage("Enter name of chat");
+            string[] pathAndName;
+            if (typeGroup == "ch" || typeGroup == "pp")
+            {
+                SendMessage("Enter user name");
+            }
+            else
+            {
+                SendMessage("Enter name of chat");
+            }
             while (true)
             {
                 AnswerClient();
-                pathAndNAme = await CheckChatAndCreatePath(user.communication.data.ToString(), typeGroup);
-                if (pathAndNAme[0] != "")
+                pathAndName = await CheckChatAndCreatePath(user.communication.data.ToString(), typeGroup);
+                if (pathAndName[0] != "")
                 {
                     SendMessage("You connect to chat");
-                    pathGroup = pathAndNAme[0];
-                    nameGroup = pathAndNAme[1];
+                    pathGroup = pathAndName[0];
+                    nameGroup = pathAndName[1];
                     break;
                 }
                 SendMessage("Don`t have this chat, enter new please");
@@ -145,9 +153,9 @@ namespace Messenger
             WriteNewPerson($@"D:\temp\messenger\Users\{user.Nickname}\peopleChatsBeen.json", personChat);
             WriteNewPerson($@"D:\temp\messenger\Users\{namePerson}\peopleChatsBeen.json", personChat);
             var path = $@"D:\temp\messenger\peopleChats\{nameChat}";
-            Directory.CreateDirectory(path);
-            await AddUser($"{path}\\users.json", user.Nickname);
-            await AddUser($"{path}\\users.json", namePerson);
+            fileMaster.CreateDirectory(path);
+            await AddData($"{path}\\users.json", user.Nickname);
+            await AddData($"{path}\\users.json", namePerson);
             return new string[] { path, nameChat };
         }
         //private async Task<string[]> CheckPeopleChats(string namePerson)
@@ -174,41 +182,20 @@ namespace Messenger
         private async void WriteNewPerson(string path, PersonChat personChat)
         {
             StringBuilder usersJson = new StringBuilder();
-            using (var stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite(path, peopleChatsBeen =>
             {
-                usersJson = await ReadFile(stream);
-                var peopleChatsBeen = JsonConvert.DeserializeObject<List<PersonChat>>(usersJson.ToString());
-                stream.Seek(0, SeekOrigin.Begin);
                 if (peopleChatsBeen == null)
                 {
                     peopleChatsBeen = new List<PersonChat>();
                 }
                 peopleChatsBeen.Add(personChat);
-                var peopleChatsBeenJson = JsonConvert.SerializeObject(peopleChatsBeen);
-                var buffer = Encoding.Default.GetBytes(peopleChatsBeenJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
-        private async Task<StringBuilder> ReadFile(FileStream stream)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            var buffer = 256;
-            var arrayBytes = new byte[buffer];
-            while (true)
-            {
-                var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
-                usersJson.Append(Encoding.Default.GetString(arrayBytes, 0, readedRealBytes));
-                if (readedRealBytes < buffer)
-                {
-                    break;
-                }
-            }
-            return usersJson;
+                return (peopleChatsBeen, true);
+            });
         }
         private async Task<string[]> CheckChatAndCreatePath(string nameGroup, string typeGroup)
         {
             List<string> groups = new List<string>();
-            var peopleChatsBeenJson = (List<PersonChat>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json", false, true);
+            var peopleChatsBeenJson = await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json");
             var peopleChatsBeen = FindPeopleInChatsBeen(peopleChatsBeenJson);
             string pathGroup = "";
             var needCreatePP = false;
@@ -225,11 +212,11 @@ namespace Messenger
                     needCorect = true;
                     break;
                 case "sg":
-                    groups = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json", true, false);
+                    groups = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json");
                     pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
                     break;
                 case "ug":
-                    groups = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\userGroups.json", true, false);
+                    groups = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\userGroups.json");
                     pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
                     break;
                 case "pg":
@@ -255,7 +242,7 @@ namespace Messenger
                         else if (needAddUser)
                         {
                             await AddGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, pathGroup);
-                            await AddUser($"{pathGroup}\\users.json", user.Nickname);
+                            await AddData($"{pathGroup}\\users.json", user.Nickname);
                         }
                         return new string[] { pathGroup, nameGroup };
                     }
@@ -265,94 +252,51 @@ namespace Messenger
         }
         private async Task<bool> CheckDeleteInvitation(string path, string data)
         {
-            var invitations = new List<string>();
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            var needDelete = false;
+            await fileMaster.ReadWrite(path, invitations =>
             {
-                var invitationsJsonSb = await ReadFile(stream);
-                invitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSb.ToString());
-            }
-            if (invitations == null)
-            {
-                return false;
-            }
-            var needDelete = invitations.Remove(data);
-            if (needDelete)
-            {
-                var invitationJson = JsonConvert.SerializeObject(invitations);
-                using (var stream = new StreamWriter(path, false))
+                if (invitations == null)
                 {
-                    await stream.WriteAsync(invitationJson);
+                    return (invitations, false);
                 }
-            }
+                needDelete = invitations.Remove(data);
+                return (invitations, needDelete);
+            });
             return needDelete;
         }
         private async Task AddGroup(string path, string nameGroup, string pathGroup)
         {
-            StringBuilder nameGroupsJsonSB = new StringBuilder();
-            List<string> groups;
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite))
-            {
-                nameGroupsJsonSB = await ReadFile(stream);
-                groups = JsonConvert.DeserializeObject<List<string>>(nameGroupsJsonSB.ToString());
-            }
-            if (groups != null)
-            {
-                foreach (var group in groups)
-                {
-                    if (group == nameGroup)
-                    {
-                        return;
-                    }
-                }
-            }
-            else
-            {
-                groups = new List<string>();
-            }
-            groups.Add(nameGroup);
-            var usersJson = JsonConvert.SerializeObject(groups);
-            using (var stream = new StreamWriter(path, false))
-            {
-                await stream.WriteAsync(usersJson);
-            }
+            await AddData(path, nameGroup);
             if (await CheckDeleteInvitation($@"D:\temp\messenger\Users\{user.Nickname}\invitation.json", $"public: {nameGroup}"))
             {
                 await CheckDeleteInvitation($@"{pathGroup}\invitation.json", user.Nickname);
             }
         }
-        private async Task AddUser(string path, string nick)
+        private async Task AddData(string path, string data)
         {
-            StringBuilder usersJsonSB = new StringBuilder();
-            List<string> users;
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite(path, allData =>
             {
-                usersJsonSB = await ReadFile(stream);
-                users = JsonConvert.DeserializeObject<List<string>>(usersJsonSB.ToString());
-            }
-            if (users != null)
-            {
-                foreach (var user in users)
+                if (allData == null)
                 {
-                    if (user == nick)
+                    allData = new List<string>();
+                }
+                else
+                {
+                    foreach (var user in allData)
                     {
-                        return;
+                        if (user == data)
+                        {
+                            return (allData, false);
+                        }
                     }
                 }
-            }
-            else
-            {
-                users = new List<string>();
-            }
-            users.Add(nick);
-            var usersJson = JsonConvert.SerializeObject(users);
-            using (var stream = new StreamWriter(path, false))
-            {
-                await stream.WriteAsync(usersJson);
-            }
+                allData.Add(data);
+                return (allData, true);
+            });
         }
         private async Task<string[]> AcceptTheInvitation()
         {
-            var invitations = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\invitation.json", true, false);
+            var invitations = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
             SendMessage("If you want to join a group write: join\n\r" +
                 "if you want to look at the invitation, write: look");
             while (true)
@@ -456,39 +400,23 @@ namespace Messenger
         private async Task WriteInvitaion(string path, string information)
         {
             var usersJsonSb = new StringBuilder();
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite(path, users =>
             {
-                usersJsonSb = await ReadFile(stream);
-                var users = JsonConvert.DeserializeObject<List<string>>(usersJsonSb.ToString());
-                if (users != null)
-                {
-                    users.Add(information);
-                }
-                else
+                if (users == null)
                 {
                     users = new List<string>();
-                    users.Add(information);
                 }
-                var usersJson = JsonConvert.SerializeObject(users);
-                var buffer = Encoding.Default.GetBytes(usersJson);
-                stream.Seek(0, SeekOrigin.Begin);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
+                users.Add(information);
+                return (users, true);
+            });
         }
         private async Task DeleteInvitation(string path, string invitation)
         {
-            var users = new List<string>();
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite(path, users =>
             {
-                var usersJsonSb = await ReadFile(stream);
-                users = JsonConvert.DeserializeObject<List<string>>(usersJsonSb.ToString());
-            }
-            users.Remove(invitation);
-            var usersJson = JsonConvert.SerializeObject(users);
-            using (var stream = new StreamWriter(path, false))
-            {
-                await stream.WriteAsync(usersJson);
-            }
+                users.Remove(invitation);
+                return (users, true);
+            });
         }
         private async Task<string[]> ChoseGroupSend(List<string>[] allChats, string message)
         {
@@ -656,15 +584,6 @@ namespace Messenger
                 SendGroups(needChats, firstMassages[numArray]);
             }
         }
-        private async Task<List<string>[]> FindAllChats()
-        {
-            var enteringChats = await ReadFiles();
-            var peopleChatsJson = await FindChatsPeople(enteringChats[0]);//////can be misstake
-            Array.Copy(enteringChats, 0, enteringChats = new List<string>[enteringChats.Length + 1], 1, enteringChats.Length - 1);
-            enteringChats[0] = enteringChats[1];
-            enteringChats[1] = peopleChatsJson;
-            return enteringChats;
-        }
         private void SendChats(List<string>[] enteringChats, bool onlyGroup)
         {
             if (!onlyGroup)
@@ -727,17 +646,27 @@ namespace Messenger
                 AnswerClient();
             }
         }
+        private async Task<List<string>[]> FindAllChats()
+        {
+            return await ReadFiles();
+            //var peopleChatsJson = await FindChatsPeople(enteringChats[0]);//////can be misstake
+            //Array.Copy(enteringChats, 0, enteringChats = new List<string>[enteringChats.Length + 1], 1, enteringChats.Length - 1);
+            //enteringChats[0] = enteringChats[1];
+            //enteringChats[1] = peopleChatsJson;
+            //return enteringChats;
+        }
         private async Task<List<string>[]> ReadFiles()
         {
             //var dataJson = await ReadFileToList($@"{UserFoldersPath}\{nickname}\Data.json", true); /////don`t need
 
-            var peopleChatsBeenJson = (List<PersonChat>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json", false, true);
+            var peopleChatsBeenJson = await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json");
             var peopleChatsBeen = FindPeopleInChatsBeen(peopleChatsBeenJson);
-            var secretGroupsJson = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json", true, false);
-            var userGroupsJson = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\userGroups.json", true, false);
+            var peopleChatsJson = await FindChatsPeople(peopleChatsBeen);//////can be misstake
+            var secretGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json");
+            var userGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\userGroups.json");
             var publicGroups = FindPublicGroup();
-            var invitationJson = (List<string>)await ReadFileToList($@"{UserFoldersPath}\{user.Nickname}\invitation.json", true, false);
-            return new List<string>[] { peopleChatsBeen, secretGroupsJson, userGroupsJson, publicGroups, invitationJson };
+            var invitationJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
+            return new List<string>[] { peopleChatsBeen, peopleChatsJson, secretGroupsJson, userGroupsJson, publicGroups, invitationJson };
         }
         private List<string> FindPeopleInChatsBeen(List<PersonChat> peopleChatsBeenJson)
         {
@@ -759,39 +688,39 @@ namespace Messenger
             }
             return peopleChatsBeen;
         }
-        private async Task<object> ReadFileToList(string path, bool toString, bool toPersonChat)
-        {
-            StringBuilder usersJson = new StringBuilder();
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                usersJson = await ReadFile(stream);
-            }
-            if (toString)
-            {
-                return JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
-            else if (toPersonChat)
-            {
-                return JsonConvert.DeserializeObject<List<PersonChat>>(usersJson.ToString());
-            }
-            else
-            {
-                return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-            }
-        }
+        //private async Task<object> ReadFileToList(string path, bool toString, bool toPersonChat)
+        //{
+        //    StringBuilder usersJson = new StringBuilder();
+        //    using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
+        //    {
+        //        usersJson = await ReadFile(stream);
+        //    }
+        //    if (toString)
+        //    {
+        //        return JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
+        //    }
+        //    else if (toPersonChat)
+        //    {
+        //        return JsonConvert.DeserializeObject<List<PersonChat>>(usersJson.ToString());
+        //    }
+        //    else
+        //    {
+        //        return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
+        //    }
+        //}
         private List<string> FindPublicGroup()
         {
-            var publicGroups = Directory.GetDirectories(@"D:\temp\messenger\publicGroup");
+            var publicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup");
             var publicGroupList = new List<string>();
             foreach (var publicGroup in publicGroups)
             {
-                publicGroupList.Add(Path.GetFileName(publicGroup));
+                publicGroupList.Add(fileMaster.GetFileName(publicGroup));
             }
             return publicGroupList;
         }
         private async Task<List<string>> FindChatsPeople(List<string> peopleChatsBeenJson)
         {
-            var allPeopleJson = (List<UserNicknameAndPasswordAndIPs>)await ReadFileToList($@"D:\temp\messenger\nicknamesAndPasswords\users.json", false, false);
+            var allPeopleJson = await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json");
             //var allPeopleWithoutPasswordJson = allPeopleJson.Select(x => x.Nickname).Where(x => x != userNick);
             var allPeopleWithoutPasswordJsons = new List<string>();
             if (allPeopleJson != null)

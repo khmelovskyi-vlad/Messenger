@@ -66,6 +66,8 @@
     <Compile Include="Chat.cs" />
     <Compile Include="Connector.cs" />
     <Compile Include="CreatorGroups.cs" />
+    <Compile Include="FileMaster.cs" />
+    <Compile Include="GroupDeleter.cs" />
     <Compile Include="GroupMaster.cs" />
     <Compile Include="GroupsLeaver.cs" />
     <Compile Include="Messenger.cs" />
@@ -76,6 +78,7 @@
     <Compile Include="SendingModes.cs" />
     <Compile Include="Server.cs" />
     <Compile Include="User.cs" />
+    <Compile Include="UserDeleter.cs" />
     <Compile Include="UserNicknameAndPasswordAndIPs.cs" />
   </ItemGroup>
   <ItemGroup>

@@ -14,8 +14,11 @@ namespace Messenger
         {
         }
         public bool Connect = true;
+        FileMaster fileMaster = new FileMaster();
         public async Task Run(int countListener)
         {
+            CreateDirectories();
+            await ReadWritePort();
             tcpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
             var tcpEndPoint = new IPEndPoint(IPAddress.Any, port);
             tcpSocket.Bind(tcpEndPoint);
@@ -27,7 +30,51 @@ namespace Messenger
                 await banerUsers.BanUser();
             }
         }
-        private const int port = 1234;
+        private async Task ReadWritePort()
+        {
+            await fileMaster.ReadWrite(@"D:\temp\messenger\ports.json", ports =>
+            {
+                if (ports == null)
+                {
+                    ports = new List<int>();
+                }
+                Console.WriteLine("Ports:");
+                foreach (var onePort in ports)
+                {
+                    Console.WriteLine(onePort);
+                }
+                while (true)
+                {
+                    Console.WriteLine("Write name port");
+                    var port = Console.ReadLine();
+                    try
+                    {
+                        this.port = Convert.ToInt32(port);
+                        break;
+                    }
+                    catch (Exception)
+                    {
+                        Console.WriteLine("Bad input, try again");
+                    }
+                }
+                Console.WriteLine("If you want to save port, click Enter");
+                var key = Console.ReadKey();
+                if (key.Key == ConsoleKey.Enter)
+                {
+                    foreach (var onePort in ports)
+                    {
+                        if (onePort == port)
+                        {
+                            return (ports, false);
+                        }
+                    }
+                    ports.Add(port);
+                    return (ports, true);
+                }
+                return (ports, false);
+            });
+        }
+        private int port;
         private Socket tcpSocket;
         private Messenger messenger = new Messenger();
         public async Task Run()
@@ -55,6 +102,15 @@ namespace Messenger
                     throw socketException;
                 }
             }, tcpSocket));
+        }
+        public void CreateDirectories()
+        {
+            fileMaster.CreateDirectory(@"D:\temp\messenger\bans");
+            fileMaster.CreateDirectory(@"D:\temp\messenger\nicknamesAndPasswords");
+            fileMaster.CreateDirectory(@"D:\temp\messenger\peopleChats");
+            fileMaster.CreateDirectory(@"D:\temp\messenger\publicGroup");
+            fileMaster.CreateDirectory(@"D:\temp\messenger\secretGroup");
+            fileMaster.CreateDirectory(@"D:\temp\messenger\Users");
         }
         //private void Test(Socket socket)
         //{

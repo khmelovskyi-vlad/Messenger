@@ -27,6 +27,11 @@ namespace Messenger
                 message = $"{message}" +
                     $"If you want change chat to group, write: ?/change\n\r";
             }
+            else
+            {
+                message = $"{message}" +
+                    $"If you want invite somebody to group, write: ?/invite\n\r";
+            }
         }
         public string NameChat { get; set; }
 
@@ -40,15 +45,18 @@ namespace Messenger
         private List<string> messages;
         private string PathChat;
         private string message;
+        FileMaster fileMaster = new FileMaster();
 
         public async Task Run(User user, bool firstConnect)
         {
             //Interlocked.Add()
+            user.communication.SendMessage(TypeChat, user.Socket);
+            user.communication.AnswerClient(user.Socket);
             user.communication.SendMessage(message, user.Socket);
             user.communication.AnswerClient(user.Socket);
             if (firstConnect)
             {
-                messages = await FirstRead();
+                await FirstRead();
             }
             FirstSentMessage(messages, user);
             UsersOnline.Add(user);
@@ -56,51 +64,47 @@ namespace Messenger
             {
                 user.communication.AnswerClient(user.Socket);
                 var message = user.communication.data.ToString();
-                if (message == "?/end")
+                switch (message)
                 {
-                    UsersOnline.Remove(user);
-                    return;
-                }
-                else if (message == "?/leave a group")
-                {
-                    GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, PathChat, TypeChat, user.communication, NameChat);
-                    if (await groupsLeaver.Leave())
-                    {
+                    case "?/end":
+                        UsersOnline.Remove(user);
                         return;
-                    }
-                }
-                else if (message == "?/delete user")
-                {
-                    await DeleteUser(user);
-                }
-                else if (message == "?/send")
-                {
-                    message = await ReciveFile(user);
-                    if (message == "?")
-                    {
+                    case "?/leave a group":
+                        GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, PathChat, TypeChat, NameChat);
+                        if (await groupsLeaver.Leave())
+                        {
+                            return;
+                        }
+                        break;
+                    case "?/delete user":
+                        await DeleteUser(user);
                         continue;
-                    }
-                }
-                else if (message == "?/download")
-                {
-                    SendFile(user);
-                    continue;
-                }
-                else if (message == "?/change")
-                {
-                    if (TypeChat == "pp" || TypeChat == "ch")
-                    {
-                        await ChangeTypeGroup(user);
+                    case "?/send":
+                        message = await ReciveFile(user);
+                        if (message == "?")
+                        {
+                            continue;
+                        }
+                        break;
+                    case "?/download":
+                        SendFile(user);
                         continue;
-                    }
-                }
-                else if (message == "?/invite")
-                {
-                    if (TypeChat == "pg" || TypeChat == "ug" || TypeChat == "sg")
-                    {
-                        await InvitePerson(user);
-                        continue;
-                    }
+                    case "?/change":
+                        if (TypeChat == "pp" || TypeChat == "ch")
+                        {
+                            await ChangeTypeGroup(user);
+                            continue;
+                        }
+                        break;
+                    case "?/invite":
+                        if (TypeChat == "pg" || TypeChat == "ug" || TypeChat == "sg")
+                        {
+                            await InvitePerson(user);
+                            continue;
+                        }
+                        break;
+                    default:
+                        break;
                 }
                 SendMessage(user, message);
             }
@@ -135,30 +139,27 @@ namespace Messenger
                         if (await CheckUsersOrleavedPeopleOrInvitation(namePerson, $@"{PathChat}\invitation.json"))
                         {
                             await AddInvites(namePerson);
-                            AddUser(user);
-                            user.communication.SendMessage("Invited person");
+                            SendMessageAndAddUser("Invited person", user);
                             return;
                         }
-                        user.communication.SendMessage("This person has invitation");
+                        SendMessageAndAddUser("This person has invitation", user);
                         return;
                     }
-                    user.communication.SendMessage("This person is in group");
+                    SendMessageAndAddUser("This person is in group", user);
                     return;
                 }
-                user.communication.SendMessage("This person leaved the group");
+                SendMessageAndAddUser("This person leaved the group", user);
                 return;
             }
-            user.communication.SendMessage("Don`t have this person");
+            SendMessageAndAddUser("Don`t have this person", user);
+        }
+        private void SendMessageAndAddUser(string message, User user)
+        {
+            user.communication.SendMessage(message);
+            AddUser(user);
         }
         private async Task AddInvites(string namePerson)
         {
-            List<string> userInvitations;
-            var userPath = $@"D:\temp\messenger\Users\{namePerson}\invitation.json";
-            using (var stream = File.Open(userPath, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var invitationsJsonSb = await ReadFile(stream);
-                userInvitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSb.ToString());
-            }
             string partInvitation;
             switch (TypeChat)
             {
@@ -175,25 +176,24 @@ namespace Messenger
                     partInvitation = "";
                     break;
             }
-            if (userInvitations == null)
+            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{namePerson}\invitation.json", userInvitations =>
             {
-                userInvitations = new List<string>();
-            }
-            userInvitations.Add($"{partInvitation}{NameChat}");
-            await WriteData(userPath, JsonConvert.SerializeObject(userInvitations));
-            List<string> groupInvitations;
-            var groupPath = $@"{PathChat}\invitation.json";
-            using (var stream = File.Open(groupPath, FileMode.OpenOrCreate, FileAccess.Read))
+                if (userInvitations == null)
+                {
+                    userInvitations = new List<string>();
+                }
+                userInvitations.Add($"{partInvitation}{NameChat}");
+                return (userInvitations, true);
+            });
+            await fileMaster.ReadWrite($@"{PathChat}\invitation.json", groupInvitations =>
             {
-                var invitationsJsonSb = await ReadFile(stream);
-                groupInvitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSb.ToString());
-            }
-            if (groupInvitations == null)
-            {
-                groupInvitations = new List<string>();
-            }
-            groupInvitations.Add(namePerson);
-            await WriteData(groupPath, JsonConvert.SerializeObject(groupInvitations));
+                if (groupInvitations == null)
+                {
+                    groupInvitations = new List<string>();
+                }
+                groupInvitations.Add(namePerson);
+                return (groupInvitations, true);
+            });
         }
         private async Task WriteData(string path, string data)
         {
@@ -204,12 +204,7 @@ namespace Messenger
         }
         private async Task<bool> CheckPerson(string namePerson)
         {
-            List<UserNicknameAndPasswordAndIPs> users;
-            using (var stream = File.Open(@"D:\temp\messenger\nicknamesAndPasswords\users.json", FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                users = JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-            }
+            var users = await fileMaster.ReadAndDesToLUserInf(@"D:\temp\messenger\nicknamesAndPasswords\users.json");
             foreach (var user in users)
             {
                 if (user.Nickname == namePerson)
@@ -221,12 +216,7 @@ namespace Messenger
         }
         private async Task<bool> CheckUsersOrleavedPeopleOrInvitation(string namePerson, string path)
         {
-            List<string> users;
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
+            var users = await fileMaster.ReadAndDesToLString(path);
             if (users == null)
             {
                 return true;
@@ -291,7 +281,7 @@ namespace Messenger
                     var usersPaths = new string[] { $@"D:\temp\messenger\Users\{user.Nickname}", userPath };
                     await DeletePeopleChatsBeen(usersPaths);
                     await AddUserToGroups(usersPaths[0], nameNewGroup, typeNewGroup, user);
-                    await AddInvitation(userPath, nameNewGroup, typeNewGroup, userGroup);
+                    await AddInvitations(userPath, nameNewGroup, typeNewGroup, userGroup);
                     var newPath = $"{pathNewGroup}\\{nameNewGroup}";
                     Directory.Move(PathChat, newPath);
                     PathChat = newPath;
@@ -302,36 +292,22 @@ namespace Messenger
                 }
             }
         }
-        private async Task AddInvitation(string userPath, string nameGroup, string typeGroup, string userGroup)
+        private async Task AddInvitations(string userPath, string nameGroup, string typeGroup, string userGroup)
         {
-            using (var stream = File.Open($"{userPath}\\invitation.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            await AddInvitation($"{userPath}\\invitation.json", $"{typeGroup}: {nameGroup}");
+            await AddInvitation($"{PathChat}\\invitation.json", userGroup);
+        }
+        private async Task AddInvitation(string path, string data)
+        {
+            await fileMaster.ReadWrite(path, invitations =>
             {
-                var invitationsJsonSB = await ReadFile(stream);
-                var invitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSB.ToString());
                 if (invitations == null)
                 {
                     invitations = new List<string>();
                 }
-                invitations.Add($"{typeGroup}: {nameGroup}");
-                stream.Seek(0, SeekOrigin.Begin);
-                var invitationsJson = JsonConvert.SerializeObject(invitations);
-                var buffer = Encoding.Default.GetBytes(invitationsJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-            using (var stream = File.Open($"{PathChat}\\invitation.json", FileMode.Create, FileAccess.ReadWrite))
-            {
-                var invitationsJsonSB = await ReadFile(stream);
-                var invitations = JsonConvert.DeserializeObject<List<string>>(invitationsJsonSB.ToString());
-                if (invitations == null)
-                {
-                    invitations = new List<string>();
-                }
-                invitations.Add(userGroup);
-                stream.Seek(0, SeekOrigin.Begin);
-                var invitationsJson = JsonConvert.SerializeObject(invitations);
-                var buffer = Encoding.Default.GetBytes(invitationsJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
+                invitations.Add(data);
+                return (invitations, true);
+            });
         }
         private async Task AddUserToGroups(string userPath, string nameGroup, string typeGroup, User user)
         {
@@ -347,22 +323,21 @@ namespace Messenger
                 default:
                     return;
             }
-            using (var stream = File.Open($"{userPath}\\{partPath}", FileMode.OpenOrCreate, FileAccess.ReadWrite))
+            await fileMaster.ReadWrite($"{userPath}\\{partPath}", groups =>
             {
-                var groupsJsonSB = await ReadFile(stream);
-                var groups = JsonConvert.DeserializeObject<List<string>>(groupsJsonSB.ToString());
                 if (groups == null)
                 {
                     groups = new List<string>();
                 }
                 groups.Add(nameGroup);
-                stream.Seek(0, SeekOrigin.Begin);
-                var groupsJson = JsonConvert.SerializeObject(groups);
-                var buffer = Encoding.Default.GetBytes(groupsJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-            List<string> users = new List<string>();
-            users.Add(user.Nickname);
+                return (groups, true);
+            });
+            //await fileMaster.ReadWrite($"{PathChat}\\users.json", users =>
+            //{
+            //    users = new List<string>() { user.Nickname };
+            //    return (users, true);
+            //});
+            List<string> users = new List<string>() { user.Nickname };
             var usersJson = JsonConvert.SerializeObject(users);
             using (var stream = new StreamWriter($"{PathChat}\\users.json", false))
             {
@@ -371,12 +346,7 @@ namespace Messenger
         }
         private async Task<string> FindUserPath(User user)
         {
-            List<string> usersGroup;
-            using (var stream = File.Open($"{PathChat}\\users.json", FileMode.Open, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                usersGroup = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
+            var usersGroup = await fileMaster.ReadAndDesToLString($"{PathChat}\\users.json");
             var usersPaths = new List<string>();
             foreach (var userGroup in usersGroup)
             {
@@ -391,28 +361,20 @@ namespace Messenger
         {
             foreach (var userPath in usersPath)
             {
-                var path = $"{userPath}\\peopleChatsBeen.json";
-                List<PersonChat> groups;
-                using (var stream = File.Open(path, FileMode.Open, FileAccess.ReadWrite))
+                await fileMaster.ReadWrite($"{userPath}\\peopleChatsBeen.json", groups =>
                 {
-                    var groupsJsonSB = await ReadFile(stream);
-                    groups = JsonConvert.DeserializeObject<List<PersonChat>>(groupsJsonSB.ToString());
-                }
-                PersonChat needGroup = new PersonChat(new string[2], "");
-                foreach (var group in groups)
-                {
-                    if (group.NameChat == NameChat)
+                    PersonChat needGroup = new PersonChat(new string[2], "");
+                    foreach (var group in groups)
                     {
-                        needGroup = group;
-                        break;
+                        if (group.NameChat == NameChat)
+                        {
+                            needGroup = group;
+                            break;
+                        }
                     }
-                }
-                groups.Remove(needGroup);
-                var groupsJson = JsonConvert.SerializeObject(groups);
-                using (var stream = new StreamWriter(path, false))
-                {
-                    await stream.WriteAsync(groupsJson);
-                }
+                    groups.Remove(needGroup);
+                    return (groups, true);
+                });
             }
         }
         private bool CheckGroups(string nameGroup, string path, User user)
@@ -552,7 +514,7 @@ namespace Messenger
                 var nickname = user.communication.data.ToString();
                 if (await CheckHavingNick(nickname))
                 {
-                    GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, PathChat, TypeChat, user.communication, NameChat);
+                    GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, PathChat, TypeChat, NameChat);
                     if (await groupsLeaver.Leave())
                     {
                         user.communication.SendMessage("Deleted this user");
@@ -574,12 +536,7 @@ namespace Messenger
         }
         private async Task<bool> CheckHavingNick(string nickname)
         {
-            List<string> users;
-            using (var stream = File.Open($"{PathChat}\\users.json", FileMode.Open, FileAccess.Read))
-            {
-                var usersJson = await ReadFile(stream);
-                users = JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-            }
+            var users = await fileMaster.ReadAndDesToLString($"{PathChat}\\users.json");
             foreach (var user in users)
             {
                 if (user == nickname)
@@ -634,34 +591,14 @@ namespace Messenger
                 await stream.WriteAsync(buffer, 0, buffer.Length);
             }
         }
-        private async Task<StringBuilder> ReadFile(FileStream stream)
+        private async Task FirstRead()
         {
-            StringBuilder usersJson = new StringBuilder();
-            var buffer = 256;
-            var arrayBytes = new byte[buffer];
-            while (true)
+            var messages = await fileMaster.ReadAndDesToLString($"{PathChat}\\data.json");
+            if (messages == null)
             {
-                var readedRealBytes = await stream.ReadAsync(arrayBytes, 0, buffer);
-                usersJson.Append(Encoding.Default.GetString(arrayBytes, 0, readedRealBytes));
-                if (readedRealBytes < buffer)
-                {
-                    break;
-                }
+                messages = new List<string>();
             }
-            return usersJson;
-        }
-        private async Task<List<string>> FirstRead()
-        {
-            using (var stream = File.Open($"{PathChat}\\data.json", FileMode.OpenOrCreate, FileAccess.Read))
-            {
-                var messagesJson = await ReadFile(stream);
-                var messages = JsonConvert.DeserializeObject<List<string>>(messagesJson.ToString());
-                if (messages == null)
-                {
-                    messages = new List<string>();
-                }
-                return messages;
-            }
+            this.messages = messages;
         }
 
 
