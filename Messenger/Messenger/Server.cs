@@ -58,7 +58,7 @@ namespace Messenger
                     }
                 }
                 Console.WriteLine("If you want to save port, click Enter");
-                var key = Console.ReadKey();
+                var key = Console.ReadKey(true);
                 if (key.Key == ConsoleKey.Enter)
                 {
                     foreach (var onePort in ports)
