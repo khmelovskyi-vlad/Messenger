@@ -82,6 +82,14 @@ namespace Messenger
             }
             IEnumerable<UserNicknameAndPasswordAndIPs> usersData = await TakeAllUserData();
             var result = await WaitForSelectMode(usersData);
+            //if (await WaitForSelectMode(usersData))
+            //{
+            //    return nickname;
+            //}
+            //else
+            //{
+            //    return "?Disconnect";
+            //}
             return nickname;
         }
         private async Task<bool> WaitForSelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
@@ -132,7 +140,7 @@ namespace Messenger
             {
                 return false;
             }
-            StringBuilder usersJson;
+            //StringBuilder usersJson;
             communication.SendMessage("Do you realy want, delete your accaunt? if yes, click Enter");
             communication.AnswerClient();
             if (communication.data.ToString() != "Yes")
@@ -163,7 +171,7 @@ namespace Messenger
                 await userDeleter.Run(userNicknameAndPassword.Nickname, false);
                 //fileMaster.DeleterFolder($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
             }
-            return result;
+            return false;
             //using (FileStream stream = File.Open(FilePath, FileMode.OpenOrCreate, FileAccess.ReadWrite))
             //{
             //    usersJson = await AddFileToSB(stream);
@@ -207,11 +215,11 @@ namespace Messenger
         }
         private async Task<bool> ConnectNewUser(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
-            communication.SendMessage("Enter a nickname that does not begin with '?'");
+            communication.SendMessage("Enter a nickname");
             if (userData == null)
             {
                 communication.AnswerClient();
-                CheckDisconect(); ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+                //CheckDisconect(); ///////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
                 var successSaveData = await EnterPasswordAndSaveData();
                 if (!successSaveData)
                 {
@@ -254,13 +262,30 @@ namespace Messenger
         }
         private async Task<bool> EnterPasswordAndSaveData()
         {
-            var nick = await CheckNickname();
-            communication.SendMessage("Enter password bigger than 7 symbols");
-            var password = CheckPassword();
-            communication.AnswerClient();
-            communication.SendMessage("LastCheck");
-            communication.AnswerClient();
-            return await AddNewUser(new string[] { nick, password });
+            while (true)
+            {
+                var nick = await CheckNickname();
+                if (nick.Length == 0)
+                {
+                    return false;
+                }
+                communication.SendMessage("Enter password bigger than 7 symbols");
+                var password = CheckPassword();
+                if (password == "")
+                {
+                    if (!CheckWantingToConnect())
+                    {
+                        return false;
+                    }
+                }
+                else
+                {
+                    communication.AnswerClient();
+                    communication.SendMessage("LastCheck");
+                    communication.AnswerClient();
+                    return await AddNewUser(new string[] { nick, password });
+                }
+            }
         }
         private async Task<string> CheckNickname()
         {
@@ -271,27 +296,28 @@ namespace Messenger
                 {
                     if (i == 9)
                     {
-                        lastString = "last check";
+                        lastString = "\n\rYou really want to conect to the server, if yes - click Enter";
                     }
                     var findSymdol = false;
-                    foreach (var symbol in communication.data.ToString())
+                    if (communication.data.Length <= 5)
                     {
-                        if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
-                            || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
-                        {
-                            findSymdol = true;
-                            var invertedComma = '"';
-                            communication.SendMessage($"nickname cannot contain characters such as:\n\r' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
-                            break;
-                        }
+                        communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
                     }
-                    if (!findSymdol)
+                    else
                     {
-                        if (communication.data.Length <= 5)
+                        foreach (var symbol in communication.data.ToString())
                         {
-                            communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
+                            if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
+                                || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
+                            {
+                                findSymdol = true;
+                                var invertedComma = '"';
+                                communication.SendMessage($"nickname cannot contain characters such as:\n\r' ', '\\', '/'," +
+                                    $" ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
+                                break;
+                            }
                         }
-                        else
+                        if(!findSymdol)
                         {
                             //if (await CheckNicknamesBan(communication.data.ToString()))
                             //{
@@ -317,8 +343,6 @@ namespace Messenger
         }
         private bool CheckWantingToConnect()
         {
-            communication.SendMessage("You really want to conect to the server, if yes - click Enter");
-            communication.AnswerClient();
             if (communication.data.ToString() == "Enter")
             {
                 return true;
@@ -327,7 +351,8 @@ namespace Messenger
         }
         private string CheckPassword()
         {
-            while (true)
+            var numberAttemps = 5;
+            for (int i = 0; i < numberAttemps; i++)
             {
                 communication.AnswerClient();
                 if (communication.data.Length > 7)
@@ -335,8 +360,21 @@ namespace Messenger
                     communication.SendMessage("Ok");
                     return communication.data.ToString();
                 }
-                communication.SendMessage("Password length < 7, enter another password");
+                else
+                {
+                    if (i == 4)
+                    {
+                        communication.SendMessage($"Password length < 7,\n\r" +
+                            $"You really want to conect to the server, if yes - click Enter");
+                        communication.AnswerClient();
+                    }
+                    else
+                    {
+                        communication.SendMessage($"Password length < 7, enter another password, number of attemps = {numberAttemps - i - 1}");
+                    }
+                }
             }
+            return "";
         }
         //private async Task<bool> EnterPasswordAndSaveData(Socket listenSocket)
         //{
@@ -385,7 +423,7 @@ namespace Messenger
                         }
                         else
                         {
-                            if (CheckWantingToConnect())
+                            if (!CheckWantingToConnect())
                             {
                                 return default(UserNicknameAndPasswordAndIPs);
                             }
@@ -420,9 +458,15 @@ namespace Messenger
                     nickname = userNicknameAndPassword.Nickname;
                     return true;
                 }
-                if (numberAttemps - i > 0)
+                if (i == 4)
                 {
-                    communication.SendMessage($"Wrong password, try again, number of attemps = {numberAttemps - i}");
+                    communication.SendMessage($"Password length < 7,\n\r" +
+                        $"You really want to conect to the server, if yes - click Enter");
+                    communication.AnswerClient();
+                }
+                else
+                {
+                    communication.SendMessage($"Wrong password, try again, number of attemps = {numberAttemps - i - 1}");
                 }
             }
             return false;

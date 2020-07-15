@@ -46,7 +46,8 @@ namespace Messenger
                 while (true)
                 {
                     Console.WriteLine("Write name port");
-                    var port = Console.ReadLine();
+                    //var port = Console.ReadLine();
+                    var port = "1234";
                     try
                     {
                         this.port = Convert.ToInt32(port);
