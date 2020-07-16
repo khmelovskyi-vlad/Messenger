@@ -230,6 +230,7 @@ namespace Messenger
             private async Task WriteData(string path, object data, FileStream stream)
             {
                 stream.SetLength(0);
+                var datas = await ReadAndDesToLString(path, stream);
                 var dataJson = JsonConvert.SerializeObject(data);
                 var buffer = Encoding.Default.GetBytes(dataJson);
                 await stream.WriteAsync(buffer, 0, buffer.Length);

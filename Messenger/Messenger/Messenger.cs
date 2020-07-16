@@ -88,11 +88,14 @@ namespace Messenger
         }
         private bool CheckOnline(string nickname, Socket listener)
         {
-            foreach (var user in online)
+            lock (locketOnline)
             {
-                if (user.Nickname == nickname)
+                foreach (var user in online)
                 {
-                    return true;
+                    if (user.Nickname == nickname)
+                    {
+                        return true;
+                    }
                 }
             }
             return false;

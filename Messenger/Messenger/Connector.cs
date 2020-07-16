@@ -81,15 +81,15 @@ namespace Messenger
                 return "?Disconnect";
             }
             IEnumerable<UserNicknameAndPasswordAndIPs> usersData = await TakeAllUserData();
-            var result = await WaitForSelectMode(usersData);
-            //if (await WaitForSelectMode(usersData))
-            //{
-            //    return nickname;
-            //}
-            //else
-            //{
-            //    return "?Disconnect";
-            //}
+            //var result = await WaitForSelectMode(usersData);
+            if (await WaitForSelectMode(usersData))
+            {
+                return nickname;
+            }
+            else
+            {
+                return "";
+            }
             return nickname;
         }
         private async Task<bool> WaitForSelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
@@ -160,7 +160,7 @@ namespace Messenger
                     {
                         return (oldData, false);
                     }
-                    oldData.Remove(userNicknameAndPassword);
+                    oldData = oldData.Where(x => x.Nickname != userNicknameAndPassword.Nickname).ToList();
                 }
                 return (oldData, true);
             });

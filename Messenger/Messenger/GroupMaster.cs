@@ -55,9 +55,9 @@ namespace Messenger
                     "Helper:\n\r" +
                     "Write all chats: ?/cc, find chat: ?/cc...\n\r" +
                     "Write all people: ?/pp, find people: ?/pp...\n\r" +
-                    "Write all chat with people: ?/ch, find chat with people: ?/ch...\n\r" +
+                    "Write all chats with people: ?/ch, find chat with people: ?/ch...\n\r" +
                     "Write all groups: ?/gg, find group: ?/gg...\n\r" +
-                    "Write all secreat groups: ?/sg, find secreat group: ?/sg...\n\r" +
+                    "Write all secret groups: ?/sg, find secreat group: ?/sg...\n\r" +
                     "Write all user groups: ?/ug, find user group: ?/ug...\n\r" +
                     "Write all public groups: ?/pg, find public group: ?/pg...\n\r" +
                     "Write all invitations: ?/ii, find invitation: ?/ii...\n\r" +
@@ -90,7 +90,7 @@ namespace Messenger
                         SendMessage("You exit messanger");
                         return new string[0];
                     }
-                    if (message == "ii")
+                    else if(message == "ii")
                     {
                         return await AcceptTheInvitation();
                     }
@@ -298,21 +298,34 @@ namespace Messenger
         {
             var invitations = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
             SendMessage("If you want to join a group write: join\n\r" +
-                "if you want to look at the invitation, write: look");
+                "if you want to look at the invitations, write: look");
             while (true)
             {
                 AnswerClient();
                 var message = user.communication.data.ToString();
-                if (message == "join")
+                switch (message)
                 {
-                    return await JoinToGroup(invitations);
+                    case "join":
+                        return await JoinToGroup(invitations);
+                    case "look":
+                        SendGroups(invitations, "Invitation:");
+                        break;
+                    default:
+                        SendMessage("Bed input, write else");
+                        break;
                 }
-                else if (message == "look")
-                {
-                    SendGroups(invitations, "Invitation:");
-                    continue;
-                }
-                SendMessage("Bed input, write else");
+                //if (message == "join")
+                //{
+                //    return await JoinToGroup(invitations);
+                //}
+                //else if (message == "look")
+                //{
+                //    SendGroups(invitations, "Invitation:");
+                //}
+                //else
+                //{
+                //    SendMessage("Bed input, write else");
+                //}
             }
         }
         private async Task<string[]> JoinToGroup(List<string> invitations)
@@ -328,8 +341,8 @@ namespace Messenger
                     if (groupName == normalInvitation)
                     {
                         var information = await EnterTheGroup(invitation, groupName);
-                        SendMessage("You join the group\n\r" +
-                            "If you want open chats, write: open");
+                        SendMessage("You have joined to the group\n\r" +
+                            "If you want to open chats, write: 'open'");
                         AnswerClient();
                         if (user.communication.data.ToString() == "open")
                         {
@@ -351,17 +364,18 @@ namespace Messenger
             string typeGroup;
             string pathGroup;
             string pathUser;
-            if (invitation[0] == 'p')
+            switch (invitation[0])
             {
-                typeGroup = "pg";
-                pathGroup = $@"{PublicGroupsPath}\{groupName}";
-                pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\userGroups.json";
-            }
-            else
-            {
-                typeGroup = "sg";
-                pathGroup = $@"{SecreatGroupsPath}\{groupName}";
-                pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\secretGroups.json";
+                case 'p':
+                    typeGroup = "pg";
+                    pathGroup = $@"{PublicGroupsPath}\{groupName}";
+                    pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\userGroups.json";
+                    break;
+                default:
+                    typeGroup = "sg";
+                    pathGroup = $@"{SecreatGroupsPath}\{groupName}";
+                    pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\secretGroups.json";
+                    break;
             }
             //var usersJsonSb = new StringBuilder();
             //using (var stream = File.Open($"{pathGroup}\\users.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
@@ -588,13 +602,13 @@ namespace Messenger
         {
             if (!onlyGroup)
             {
-                SendGroups(enteringChats[0], "Chat with people:");
+                SendGroups(enteringChats[0], "Chats with people:");
                 SendGroups(enteringChats[1], "All people:");
             }
-            SendGroups(enteringChats[2], "Secret grout:");
-            SendGroups(enteringChats[3], "User group:");
-            SendGroups(enteringChats[4], "Public group:");
-            SendGroups(enteringChats[5], "Invitation:");
+            SendGroups(enteringChats[2], "Secret groups:");
+            SendGroups(enteringChats[3], "User groups:");
+            SendGroups(enteringChats[4], "Public groups:");
+            SendGroups(enteringChats[5], "Invitations:");
             //if (enteringChats[0].Count == 0)
             //{
             //    SendMessage("Chatting with people:\n\t(don`t have)", listener);
@@ -661,10 +675,24 @@ namespace Messenger
 
             var peopleChatsBeenJson = await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json");
             var peopleChatsBeen = FindPeopleInChatsBeen(peopleChatsBeenJson);
+            //var peopleChatsBeen = (await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json"))
+            //    .Select(chat => chat.Nicknames[0] != user.Nickname ? chat.Nicknames[0] : chat.Nicknames[1])
+            //    .DefaultIfEmpty()
+            //    .ToList();
             var peopleChatsJson = await FindChatsPeople(peopleChatsBeen);//////can be misstake
+            //var peopleChatsJson = (await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            //    .Select(x => x.Nickname)
+            //    .Where(x => x != user.Nickname)
+            //    .Distinct()
+            //    .DefaultIfEmpty()
+            //    .ToList();
             var secretGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json");
             var userGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\userGroups.json");
             var publicGroups = FindPublicGroup();
+            //var publicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup")
+            //    .Select(path => fileMaster.GetFileName(path))
+            //    .DefaultIfEmpty()
+            //    .ToList();
             var invitationJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
             return new List<string>[] { peopleChatsBeen, peopleChatsJson, secretGroupsJson, userGroupsJson, publicGroups, invitationJson };
         }
@@ -735,7 +763,7 @@ namespace Messenger
                             if (personJson.Nickname == personChatBeenJson)
                             {
                                 needAdd = false;
-                                continue;
+                                continue; //break?
                             }
                         }
                     }
