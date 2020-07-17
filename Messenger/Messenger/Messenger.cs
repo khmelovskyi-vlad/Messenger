@@ -28,7 +28,7 @@ namespace Messenger
         private List<Chat> chats = new List<Chat>();
         public async Task<bool> Connect(Socket listener)
         {
-            Connector connector = new Connector(listener);
+            Connector connector = new Connector(listener, this);
             var nickname = await connector.Run();
             if (nickname == "?Disconnect")
             {

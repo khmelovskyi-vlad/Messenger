@@ -80,6 +80,17 @@ namespace Messenger
         }
         static async Task<int> Main(string[] args)
         {
+            var k = new List<string> { };
+            k = null;
+            if (k.DefaultIfEmpty("sf").Contains("lol"))
+            {
+                Console.WriteLine("lol");
+            }
+            else
+            {
+                Console.WriteLine("no");
+            }
+            Console.ReadKey();
             //TryTo(@"D:\temp\ok3\test2.txt");
             //Console.WriteLine("next");
             //Console.ReadKey();
