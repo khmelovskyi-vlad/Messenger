@@ -80,9 +80,17 @@ namespace Messenger
         }
         static async Task<int> Main(string[] args)
         {
+            var first = new int[] { 1, 2, 3, 4 };
+            var second = new int[] { 2, 5 };
+            var three = first.Except(second);
+            foreach (var i in three)
+            {
+                Console.WriteLine(i);
+            }
+            var l = Directory.GetDirectories("D:\\temp\\zerro").DefaultIfEmpty().Where(x => x != "").ToList();
             var k = new List<string> { };
             k = null;
-            if (k.DefaultIfEmpty("sf").Contains("lol"))
+            if ((k ?? new List<string> { }).Contains("lol"))
             {
                 Console.WriteLine("lol");
             }

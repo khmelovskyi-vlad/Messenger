@@ -66,7 +66,7 @@ namespace Messenger
             }
             IEnumerable<UserNicknameAndPasswordAndIPs> usersData = await TakeAllUserData();
             //var result = await WaitForSelectMode(usersData);
-            if (await WaitForSelectMode(usersData))
+            if (await SelectMode(usersData))
             {
                 return nickname;
             }
@@ -76,10 +76,10 @@ namespace Messenger
             }
             return nickname;
         }
-        private async Task<bool> WaitForSelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
+        private async Task<bool> SelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
-            communication.SendMessage("If you want to connect to the server using your nickname, press Enter,\n\r" +
-                "if you want to create a new user, press Tab,\n\r" +
+            communication.SendMessage("If you want to connect to the server using your account, press Enter,\n\r" +
+                "if you want to create a new account, press Tab,\n\r" +
                 "if you want to log out, click Escape,\n\r" +
                 "if you want to delete your account, click Delete\n\r");
             communication.AnswerClient();
@@ -87,10 +87,10 @@ namespace Messenger
             switch (communication.data.ToString())
             {
                 case "using":
-                    successConnection = await ConnectUsedNickname(usersData);
+                    successConnection = await ConnectRegisteredUser(usersData);
                     break;
                 case "new":
-                    successConnection = await ConnectNewUser(usersData);
+                    successConnection = await CreateNewAccount(usersData);
                     break;
                 case "escape":
                     successConnection = await DisconectUser(usersData);
@@ -99,7 +99,7 @@ namespace Messenger
                     successConnection = await DeleteAccount(usersData);/////////////////////////// if don`t have nickname?
                     break;
                 default:
-                    successConnection = await WaitForSelectMode(usersData);
+                    successConnection = await SelectMode(usersData);
                     break;
             }
             return successConnection;
@@ -115,7 +115,7 @@ namespace Messenger
             }
             communication.SendMessage("Сhoose what you want to do");
             communication.AnswerClient();
-            return await WaitForSelectMode(usersData);
+            return await SelectMode(usersData);
         }
         private async Task<bool> DeleteAccount(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
@@ -167,7 +167,7 @@ namespace Messenger
             communication.SendMessage("Don`t have this nickname");
             return false;
         }
-        private async Task<bool> ConnectNewUser(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
+        private async Task<bool> CreateNewAccount(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
             communication.SendMessage("Enter a nickname");
             while (true)
@@ -201,8 +201,7 @@ namespace Messenger
                 {
                     return false;
                 }
-                communication.SendMessage("Enter password bigger than 7 symbols");
-                var password = CheckPassword();
+                var password = CheckPassword(new UserNicknameAndPasswordAndIPs(), false);
                 if (password == "")
                 {
                     if (!CheckWantingToConnect())
@@ -227,7 +226,7 @@ namespace Messenger
                     {
                         lastString = "\n\rYou really want to conect to the server, if yes - click Enter";
                     }
-                    var findSymdol = false;
+                    var foundSymdol = false;
                     if (communication.data.Length <= 5)
                     {
                         communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
@@ -239,14 +238,14 @@ namespace Messenger
                             if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
                                 || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
                             {
-                                findSymdol = true;
+                                foundSymdol = true;
                                 var invertedComma = '"';
                                 communication.SendMessage($"nickname cannot contain characters such as:\n\r' ', '\\', '/'," +
                                     $" ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
                                 break;
                             }
                         }
-                        if(!findSymdol)
+                        if(!foundSymdol)
                         {
                             if (!await CheckNicknamesBan(communication.data.ToString()))
                             {
@@ -269,7 +268,10 @@ namespace Messenger
         }
         private bool CheckNicknamesOnline(string nick)
         {
-            return messenger.online.Select(user => user.Nickname).Contains(nick);
+            lock (messenger.locketOnline)
+            {
+                return messenger.online.Select(user => user.Nickname).Contains(nick);
+            }
         }
         private bool CheckWantingToConnect()
         {
@@ -279,32 +281,32 @@ namespace Messenger
             }
             return false;
         }
-        private string CheckPassword()
-        {
-            var numberAttemps = 5;
-            for (int i = 0; i < numberAttemps; i++)
-            {
-                communication.AnswerClient();
-                if (communication.data.Length > 7)
-                {
-                    return communication.data.ToString();
-                }
-                else
-                {
-                    if (i == 4)
-                    {
-                        communication.SendMessage($"Password length < 7,\n\r" +
-                            $"You really want to conect to the server, if yes - click Enter");
-                        communication.AnswerClient();
-                    }
-                    else
-                    {
-                        communication.SendMessage($"Password length < 7, enter another password, number of attemps = {numberAttemps - i - 1}");
-                    }
-                }
-            }
-            return "";
-        }
+        //private string CheckPassword()
+        //{
+        //    var numberAttemps = 5;
+        //    for (int i = 0; i < numberAttemps; i++)
+        //    {
+        //        communication.AnswerClient();
+        //        if (communication.data.Length > 7)
+        //        {
+        //            return communication.data.ToString();
+        //        }
+        //        else
+        //        {
+        //            if (i == 4)
+        //            {
+        //                communication.SendMessage($"Password length < 7,\n\r" +
+        //                    $"You really want to conect to the server, if yes - click Enter");
+        //                communication.AnswerClient();
+        //            }
+        //            else
+        //            {
+        //                communication.SendMessage($"Password length < 7, enter another password, number of attemps = {numberAttemps - i - 1}");
+        //            }
+        //        }
+        //    }
+        //    return "";
+        //}
         private async Task<UserNicknameAndPasswordAndIPs> CheckNicknameAndPassword(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
             communication.SendMessage("Enter a nickname");
@@ -327,8 +329,10 @@ namespace Messenger
                     if (nick == userNicknameAndPassword.Nickname)
                     {
                         findNick = true;
-                        if (CheckPassword(userNicknameAndPassword))
+                        if (CheckPassword(userNicknameAndPassword, true) != "")
                         {
+                            communication.SendMessage("You enter to messenger");
+                            nickname = userNicknameAndPassword.Nickname;
                             return userNicknameAndPassword;
                         }
                         else
@@ -348,33 +352,71 @@ namespace Messenger
             }
             return default(UserNicknameAndPasswordAndIPs);
         }
-        private bool CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword)
+        private string CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
         {
-            var numberAttemps = 5;
             communication.SendMessage("Enter password bigger than 7 symbols");
+            var numberAttemps = 5;
             for (int i = 0; i < numberAttemps; i++)
             {
                 communication.AnswerClient();
-                if (communication.data.ToString() == userNicknameAndPassword.Password)
+                if (CheckPasswordCondition(userNicknameAndPassword, checkHavingPassword))
                 {
-                    communication.SendMessage("You enter to messenger");
-                    nickname = userNicknameAndPassword.Nickname;
-                    return true;
-                }
-                if (i == 4)
-                {
-                    communication.SendMessage($"Password length < 7,\n\r" +
-                        $"You really want to conect to the server, if yes - click Enter");
-                    communication.AnswerClient();
+                    return communication.data.ToString();
                 }
                 else
                 {
-                    communication.SendMessage($"Wrong password, try again, number of attemps = {numberAttemps - i - 1}");
+                    if (i == 4)
+                    {
+                        communication.SendMessage($"Password length < 7,\n\r" +
+                            $"You really want to conect to the server, if yes - click Enter");
+                        communication.AnswerClient();
+                    }
+                    else
+                    {
+                        communication.SendMessage($"Password length < 7, enter another password, a number of attemps left = {numberAttemps - i - 1}");
+                    }
                 }
             }
-            return false;
+            return "";
         }
-        private async Task<bool> ConnectUsedNickname(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
+        private bool CheckPasswordCondition(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
+        {
+            if (checkHavingPassword)
+            {
+                return communication.data.ToString() == userNicknameAndPassword.Password;
+            }
+            else
+            {
+                return communication.data.Length > 7;
+            }
+        }
+        //private bool CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword)
+        //{
+        //    var numberAttemps = 5;
+        //    communication.SendMessage("Enter password bigger than 7 symbols");
+        //    for (int i = 0; i < numberAttemps; i++)
+        //    {
+        //        communication.AnswerClient();
+        //        if (communication.data.ToString() == userNicknameAndPassword.Password)
+        //        {
+        //            communication.SendMessage("You enter to messenger");
+        //            nickname = userNicknameAndPassword.Nickname;
+        //            return true;
+        //        }
+        //        if (i == 4)
+        //        {
+        //            communication.SendMessage($"Password length < 7,\n\r" +
+        //                $"You really want to conect to the server, if yes - click Enter");
+        //            communication.AnswerClient();
+        //        }
+        //        else
+        //        {
+        //            communication.SendMessage($"Wrong password, try again, number of attemps = {numberAttemps - i - 1}");
+        //        }
+        //    }
+        //    return false;
+        //}
+        private async Task<bool> ConnectRegisteredUser(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
             var userNicknameAndPassword = await CheckNicknameAndPassword(userData);
             if (userNicknameAndPassword.Equals(default(UserNicknameAndPasswordAndIPs)))
@@ -399,43 +441,6 @@ namespace Messenger
                     return (users, true);
                 });
             }
-        }
-        private bool FindNick(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
-        {
-            var findNick = false;
-            foreach (var userNicknameAndPassword in userData)
-            {
-                if (communication.data.ToString() == userNicknameAndPassword.Nickname)
-                {
-                    var numberAttemps = 5;
-                    findNick = true;
-                    communication.SendMessage("Enter password bigger than 7 symbols");
-                    for (int i = 0; i < numberAttemps; i++)
-                    {
-                        communication.AnswerClient();
-                        if (communication.data.ToString() == userNicknameAndPassword.Password)
-                        {
-                            communication.SendMessage("You enter to messenger");
-                            return true;
-                        }
-                        if (numberAttemps - i > 0)
-                        {
-                            communication.SendMessage($"Wrong password, try again, number of attemps = {numberAttemps - i}");
-                        }
-                        else
-                        {
-                            communication.SendMessage($"Number of attemps = {numberAttemps - i}," +
-                                $"You really want to conect to the server, if yes - click Enter");
-                        }
-                    }
-                }
-            }
-            if (!findNick)
-            {
-                communication.AnswerClient();
-                communication.SendMessage("Wrong nickname, enter new");
-            }
-            return false;
         }
         private async Task<IEnumerable<UserNicknameAndPasswordAndIPs>> TakeAllUserData()
         {

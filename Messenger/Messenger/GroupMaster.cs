@@ -76,7 +76,6 @@ namespace Messenger
                         {
                             return information;
                         }
-                        continue;
                     }
                     else
                     {
@@ -527,13 +526,8 @@ namespace Messenger
         }
         private void HelpFindChat(List<string>[] allChats, string message)
         {
-            var mode = $"{message[2]}{message[3]}";
-            var nameBuilding = new StringBuilder();
-            for (int i = 4; i < message.Length; i++)
-            {
-                nameBuilding.Append(message[i]);
-            }
-            var beginningName = nameBuilding.ToString();
+            var mode = message.Substring(2, 2);
+            var beginningName = message.Remove(0, 4);
             switch (mode)
             {
                 case "cc":
@@ -671,7 +665,6 @@ namespace Messenger
         }
         private async Task<List<string>[]> ReadFiles()
         {
-            //var dataJson = await ReadFileToList($@"{UserFoldersPath}\{nickname}\Data.json", true); /////don`t need
 
             var peopleChatsBeenJson = await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json");
             var peopleChatsBeen = FindPeopleInChatsBeen(peopleChatsBeenJson);
@@ -680,12 +673,12 @@ namespace Messenger
             //    .DefaultIfEmpty()
             //    .ToList();
             var peopleChatsJson = await FindChatsPeople(peopleChatsBeen);//////can be misstake
-            //var peopleChatsJson = (await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
-            //    .Select(x => x.Nickname)
-            //    .Where(x => x != user.Nickname)
-            //    .Distinct()
-            //    .DefaultIfEmpty()
-            //    .ToList();
+            var peopleChatsJsonn = (await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+                .Select(x => x.Nickname)
+                .Where(x => x != user.Nickname)
+                .Except(peopleChatsBeen)
+                .DefaultIfEmpty()
+                .ToList();
             var secretGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json");
             var userGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\userGroups.json");
             var publicGroups = FindPublicGroup();
@@ -716,26 +709,6 @@ namespace Messenger
             }
             return peopleChatsBeen;
         }
-        //private async Task<object> ReadFileToList(string path, bool toString, bool toPersonChat)
-        //{
-        //    StringBuilder usersJson = new StringBuilder();
-        //    using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Read))
-        //    {
-        //        usersJson = await ReadFile(stream);
-        //    }
-        //    if (toString)
-        //    {
-        //        return JsonConvert.DeserializeObject<List<string>>(usersJson.ToString());
-        //    }
-        //    else if (toPersonChat)
-        //    {
-        //        return JsonConvert.DeserializeObject<List<PersonChat>>(usersJson.ToString());
-        //    }
-        //    else
-        //    {
-        //        return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(usersJson.ToString());
-        //    }
-        //}
         private List<string> FindPublicGroup()
         {
             var publicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup");

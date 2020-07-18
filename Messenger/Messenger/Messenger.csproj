@@ -62,6 +62,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="AllChats.cs" />
     <Compile Include="BanerUsers.cs" />
     <Compile Include="Chat.cs" />
     <Compile Include="Connector.cs" />
