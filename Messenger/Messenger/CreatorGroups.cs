@@ -73,24 +73,17 @@ namespace Messenger
         }
         private bool CheckGroups(string nameGroup, string typeGroup)
         {
-            string[] groups;
-            if (typeGroup == "pg")
+            switch (typeGroup)
             {
-                groups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup");
+                case "pg":
+                    return !(fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup") ?? new string[0])
+                        .Select(path => fileMaster.GetFileName(path))
+                        .Contains(nameGroup);
+                default: //(sg)
+                    return !(fileMaster.GetDirectories(@"D:\temp\messenger\secretGroup") ?? new string[0])
+                        .Select(path => fileMaster.GetFileName(path))
+                        .Contains(nameGroup);
             }
-            else
-            {
-                groups = fileMaster.GetDirectories(@"D:\temp\messenger\secretGroup");
-            }
-            foreach (var group in groups)
-            {
-                var groupWithoutPath = fileMaster.GetFileName(group);
-                if (nameGroup == groupWithoutPath)
-                {
-                    return false;
-                }
-            }
-            return true;
         }
         public async Task<string[]> Run()
         {
@@ -128,7 +121,8 @@ namespace Messenger
                         {
                             invitedPeople.Add(nick);
                             canCreate = true;
-                            SendMessage(askForClien);
+                            SendMessage($"Ok, person was invited\n\r" +
+                                $"{askForClien}");
                         }
                         else
                         {
@@ -146,19 +140,12 @@ namespace Messenger
         }
         private bool CheckInInvitedList(List<string> invitedPeople, string nick)
         {
-            foreach (var invitedPerson in invitedPeople)
-            {
-                if (invitedPerson == nick)
-                {
-                    return false;
-                }
-            }
-            return true;
+            return !invitedPeople.Contains(nick);
         }
         private async Task<string[]> CreateNewGroup(string nameGroup, string typeGroup, List<string> invitedPeople)
         {
             var pathGroup = await AddGroup(nameGroup, typeGroup, invitedPeople);
-            InvitePeople(invitedPeople, nameGroup, typeGroup);
+            await InvitePeople(invitedPeople, nameGroup, typeGroup);
             SendMessage("You create group, thanks.\n\r" +
                 "If you want to open it, write ok, else - press else");
             AnswerClient();
@@ -170,81 +157,42 @@ namespace Messenger
         }
         private bool CheckPeople(IEnumerable<string> people, string nick)
         {
-            foreach (var person in people)
-            {
-                if (person == nick)
-                {
-                    return true;
-                }
-            }
-            return false;
+            return people.Contains(nick);
         }
         private async Task<string> AddGroup(string nameGroup, string typeGroup, List<string> invitedPeople)
         {
-            StringBuilder directoryName = new StringBuilder();
-            if (typeGroup == "pg")
+            string pathGroup;
+            switch (typeGroup)
             {
-                directoryName.Append($"{PublicGroupsPath}\\{nameGroup}");
+                case "pg":
+                    pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
+                    break;
+                default: //(sg)
+                    pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
+                    break;
             }
-            else if (typeGroup == "sg")
-            {
-                directoryName.Append($"{SecreatGroupsPath}\\{nameGroup}");
-            }
-            //var timeString = DateTime.Now.ToString();
-            //StringBuilder normalTime = new StringBuilder();
-            //foreach (var timeChar in timeString)
-            //{
-            //    if (timeChar == ':')
-            //    {
-            //        normalTime.Append('.');
-            //        continue;
-            //    }
-            //    normalTime.Append(timeChar);
-            //}
-            //Directory.CreateDirectory($"{directoryName}{normalTime}");
-            var pathGroup = directoryName.ToString();
             fileMaster.CreateDirectory(pathGroup);
-            AddUser($"{pathGroup}\\users.json");
-            await WriteInvite($"{pathGroup}\\invitation.json", invitedPeople);
+            await fileMaster.AddUser($"{pathGroup}\\users.json", user.Nickname);
+            await fileMaster.WriteInvite($"{pathGroup}\\invitation.json", invitedPeople);
             return pathGroup;
         }
-        private async Task WriteInvite(string path, List<string> invitedPeople)
+        private async Task InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
         {
-            using (var stream = File.Open(path, FileMode.CreateNew, FileAccess.Write))
+            switch (typeGroup)
             {
-                var users = new List<string>();
-                var invitedPeopleJson = JsonConvert.SerializeObject(invitedPeople);
-                var buffer = Encoding.Default.GetBytes(invitedPeopleJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
-        private async void AddUser(string path)
-        {
-            using (var stream = File.Open(path, FileMode.Create, FileAccess.Write))
-            {
-                var users = new List<string>();
-                users.Add(user.Nickname);
-                var peopleChatsBeenJson = JsonConvert.SerializeObject(users);
-                var buffer = Encoding.Default.GetBytes(peopleChatsBeenJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
-        private void InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
-        {
-            if (typeGroup == "pg")
-            {
-                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, "my group");
-            }
-            else if (typeGroup == "sg")
-            {
-                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\secretGroups.json", nameGroup, "my group");
+                case "pg":
+                    await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, "my group");
+                    break;
+                default: //(sg)
+                    await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\secretGroups.json", nameGroup, "my group");
+                    break;
             }
             foreach (var invitedPerson in invitedPeople)
             {
-                ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{invitedPerson}\invitation.json", nameGroup, typeGroup); //////////////////// check if somebode delete your nick?
+                await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{invitedPerson}\invitation.json", nameGroup, typeGroup); //////////////////// check if somebode delete your nick?
             }
         }
-        private async void ReadWriteInvitationOrGroup(string path, string nameGroup, string typeGroup)
+        private async Task ReadWriteInvitationOrGroup(string path, string nameGroup, string typeGroup)
         {
             await fileMaster.ReadWrite(path, usersInvitation =>
             {
@@ -287,19 +235,11 @@ namespace Messenger
         }
         private async Task<List<string>> FindChatsPeople()
         {
-            var allPeopleJson = await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json");
-            var allPeopleWithoutPasswordJsons = new List<string>();
-            if (allPeopleJson != null)
-            {
-                foreach (var personJson in allPeopleJson)
-                {
-                    if (personJson.Nickname != user.Nickname)
-                    {
-                        allPeopleWithoutPasswordJsons.Add(personJson.Nickname);
-                    }
-                }
-            }
-            return allPeopleWithoutPasswordJsons;
+            return ((await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+                ?? new List<UserNicknameAndPasswordAndIPs>())
+                .Select(user => user.Nickname)
+                .Where(nickname => nickname != user.Nickname)
+                .ToList();
         }
 
 
@@ -307,7 +247,7 @@ namespace Messenger
 
 
 
-        
+
         private void AnswerClient()
         {
             user.communication.AnswerClient();

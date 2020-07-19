@@ -27,18 +27,18 @@ namespace Messenger
         //public List<string> AllChats;
         //public List<string> AllGroups;
         public List<string> ChatsWithPeople;
-        public List<string> AllPeople;
+        public List<string> AllElsePeople;
         public List<string> SecretGroups;
         public List<string> UserGroups;
         public List<string> PublicGroups;
         public List<string> Invitations;
-        private async Task FindAllChats()
+        public async Task FindAllChats()
         {
             ChatsWithPeople = ((await fileMaster.ReadAndDesToPersonCh($@"{userFoldersPath}\{nick}\peopleChatsBeen.json"))
                 ?? new List<PersonChat>())
                 .Select(chat => chat.Nicknames[0] != nick ? chat.Nicknames[0] : chat.Nicknames[1])
                 .ToList();
-            AllPeople = ((await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            AllElsePeople = ((await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(x => x.Nickname)
                 .Where(x => x != nick)
