@@ -22,7 +22,7 @@ namespace Messenger
         private string PeopleChatsPath { get { return @"D:\temp\messenger\peopleChats"; } }
         private FileMaster fileMaster = new FileMaster();
         private UserChats userChats;
-        public async Task<string[]> Run()
+        public async Task<GroupInformation> Run()
         {
             userChats = new UserChats(fileMaster, user.Nickname, UserFoldersPath, PublicGroupsPath, SecreatGroupsPath, PeopleChatsPath);
             await userChats.FindAllChats();
@@ -48,7 +48,7 @@ namespace Messenger
             //    }
             //}
         }
-        private async Task<string[]> ModeSelection()
+        private async Task<GroupInformation> ModeSelection()
         {
             while (true)
             {
@@ -74,10 +74,10 @@ namespace Messenger
                     AnswerClient();
                     if (message.Length == 4)
                     {
-                        var information = await ChoseGroupSend(message);
-                        if (information.Length == 3)
+                        var groupInformation = await ChoseGroupSend(message);
+                        if (groupInformation.Name != null)
                         {
-                            return information;
+                            return groupInformation;
                         }
                     }
                     else
@@ -90,7 +90,7 @@ namespace Messenger
                     if (message == "exit")
                     {
                         SendMessage("You exit messanger");
-                        return new string[0];
+                        return new GroupInformation { CanOpenChat = false };
                     }
                     else if(message == "ii")
                     {
@@ -102,13 +102,10 @@ namespace Messenger
                     }
                 }
             }
-            return new string[0];
         }
-        private async Task<string[]> FindNeedGroup(string message, string typeGroup)
+        private async Task<GroupInformation> FindNeedGroup(string message, string typeGroup)
         {
-            string nameGroup;
-            string pathGroup;
-            string[] pathAndName;
+            GroupInformation groupInformation;
             if (typeGroup == "ch" || typeGroup == "pp")
             {
                 SendMessage("Enter user name");
@@ -120,32 +117,30 @@ namespace Messenger
             while (true)
             {
                 AnswerClient();
-                pathAndName = await CheckChatAndCreatePath(user.communication.data.ToString(), typeGroup);
-                if (pathAndName[0] != "")
+                groupInformation = await CheckChatAndCreatePath(user.communication.data.ToString(), typeGroup);
+                if (groupInformation.CanOpenChat)
                 {
                     SendMessage("You connect to chat");
-                    pathGroup = pathAndName[0];
-                    nameGroup = pathAndName[1];
-                    break;
+                    return groupInformation;
                 }
                 SendMessage("Don`t have this chat, enter new please");
             }
-            return new string[] { typeGroup, nameGroup, pathGroup };
         }
-        private string[] FindPathChat(string namePerson, List<PersonChat> peopleChatsBeenJson)
+        private async Task<GroupInformation> FindPathChat(string namePerson, string typeGroup)
         {
-            //peopleChatsBeenJson = ((await fileMaster.ReadAndDesToPersonCh($@"{userFoldersPath}\{nick}\peopleChatsBeen.json"))
-            //    ?? new List<PersonChat>());
-            foreach (var peopleChatBeenJson in peopleChatsBeenJson)
+            var personChats = await userChats.FindPersonChats();
+            foreach (var personChat in personChats)
             {
-                if (peopleChatBeenJson.Nicknames[0] == namePerson || peopleChatBeenJson.Nicknames[1] == namePerson)
+                if (personChat.Nicknames[0] == namePerson || personChat.Nicknames[1] == namePerson)
                 {
-                    return new string[] { $@"D:\temp\messenger\peopleChats\{peopleChatBeenJson.NameChat}", peopleChatBeenJson.NameChat};
+                    return new GroupInformation(true, typeGroup,
+                        personChat.NameChat,
+                        $@"D:\temp\messenger\peopleChats\{personChat.NameChat}");
                 }
             }
-            return new string[] { "", "" };
+            return new GroupInformation { CanOpenChat = false};
         }
-        private async Task<string[]> CreateChat(string namePerson, List<string> people)
+        private async Task<GroupInformation> CreateChat(string namePerson, List<string> people, string typeGroup)
         {
             //var pathAndName = await CheckPeopleChats(namePerson);
             //if (pathAndName[0] != "")
@@ -160,7 +155,7 @@ namespace Messenger
             fileMaster.CreateDirectory(path);
             await AddData($"{path}\\users.json", user.Nickname);
             await AddData($"{path}\\users.json", namePerson);
-            return new string[] { path, nameChat };
+            return new GroupInformation(true, typeGroup, nameChat, path);
         }
         //private async Task<string[]> CheckPeopleChats(string namePerson)
         //{
@@ -187,7 +182,6 @@ namespace Messenger
         {
             await fileMaster.ReadWrite(path, peopleChatsBeen =>
             {
-                //(peopleChatsBeen ?? new List<PersonChat>()).Add(personChat);
                 if (peopleChatsBeen == null)
                 {
                     peopleChatsBeen = new List<PersonChat>();
@@ -196,75 +190,69 @@ namespace Messenger
                 return (peopleChatsBeen, true);
             });
         }
-        private async Task<string[]> CheckChatAndCreatePath(string nameGroup, string typeGroup)
+        private async Task<GroupInformation> CheckChatAndCreatePath(string nameGroup, string typeGroup)
         {
             List<string> groups = new List<string>();
-            string pathGroup = "";
+            string pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
             var needCreatePP = false;
             var needCorect = false;
             var needAddUser = false;
             switch (typeGroup)
             {
                 case "pp":
-                    groups = /*AllElsePeople*/;
+                    groups = userChats.AllElsePeople;
                     needCreatePP = true;
                     break;
                 case "ch":
-                    groups = /*userChats.ChatsWithPeople*/;
+                    groups = userChats.ChatsWithPeople;
                     needCorect = true;
                     break;
                 case "sg":
-                    groups = /*userChats.SecretGroups*/;
+                    groups = userChats.SecretGroups;
                     pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
                     break;
                 case "ug":
-                    groups = /*userChats.UserGroups*/;
-                    pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
+                    groups = userChats.UserGroups;
                     break;
                 case "pg":
-                    groups = /*userChats.PublicGroups*/;
-                    pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
+                    groups = userChats.PublicGroups;
                     needAddUser = true;
                     break;
             }
-            if (groups != null && groups.Count != 0)
+            if (groups != null/* && groups.Count != 0 */)
             {
                 foreach (var group in groups)
                 {
                     if (group == nameGroup)
                     {
-                        if (needCorect)
+                        if (needCreatePP)
                         {
-                            return FindPathChat(nameGroup, /*userChats.ChatsWithPeople*/);
+                            return await CreateChat(nameGroup, groups, typeGroup);
                         }
-                        else if (needCreatePP)
+                        else if (needCorect)
                         {
-                            return await CreateChat(nameGroup, groups);
+                            return await FindPathChat(nameGroup, typeGroup);
                         }
                         else if (needAddUser)
                         {
                             await AddGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, pathGroup);
-                            await AddData($"{pathGroup}\\users.json", user.Nickname);
                         }
-                        return new string[] { pathGroup, nameGroup };
+                        return new GroupInformation(true, typeGroup, nameGroup, pathGroup);
                     }
                 }
             }
-            return new string[] { "", nameGroup };
+            return new GroupInformation(false, typeGroup, nameGroup, pathGroup);
         }
         private async Task<bool> CheckDeleteInvitation(string path, string data)
         {
-            var needDelete = false;
-            await fileMaster.ReadWrite(path, invitations =>
+            return await fileMaster.ReadWrite(path, invitations =>
             {
                 if (invitations == null)
                 {
                     return (invitations, false);
                 }
-                needDelete = invitations.Remove(data);
-                return (invitations, needDelete);
+                return (invitations, invitations.Remove(data));
             });
-            return needDelete;
         }
         private async Task AddGroup(string path, string nameGroup, string pathGroup)
         {
@@ -273,6 +261,7 @@ namespace Messenger
             {
                 await CheckDeleteInvitation($@"{pathGroup}\invitation.json", user.Nickname);
             }
+            await AddData($"{pathGroup}\\users.json", user.Nickname);
         }
         private async Task AddData(string path, string data)
         {
@@ -284,21 +273,18 @@ namespace Messenger
                 }
                 else
                 {
-                    foreach (var user in allData)
+                    if (allData.Contains(data))
                     {
-                        if (user == data)
-                        {
-                            return (allData, false);
-                        }
+                        return (allData, false);
                     }
                 }
                 allData.Add(data);
                 return (allData, true);
             });
         }
-        private async Task<string[]> AcceptTheInvitation()
+        private async Task<GroupInformation> AcceptTheInvitation()
         {
-            var invitations = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
+            await userChats.FindInvitations();
             SendMessage("If you want to join a group write: join\n\r" +
                 "if you want to look at the invitations, write: look");
             while (true)
@@ -308,9 +294,9 @@ namespace Messenger
                 switch (message)
                 {
                     case "join":
-                        return await JoinToGroup(invitations);
+                        return await JoinToGroup();
                     case "look":
-                        SendGroups(invitations, "Invitation:");
+                        SendGroups(userChats.Invitations, "Invitation:");
                         break;
                     default:
                         SendMessage("Bed input, write else");
@@ -330,38 +316,38 @@ namespace Messenger
                 //}
             }
         }
-        private async Task<string[]> JoinToGroup(List<string> invitations)
+        private async Task<GroupInformation> JoinToGroup()
         {
             SendMessage("Write the name of the group");
             while (true)
             {
                 AnswerClient();
                 var groupName = user.communication.data.ToString();
-                foreach (var invitation in invitations)
+                foreach (var invitation in userChats.Invitations)
                 {
                     var normalInvitation = invitation.Remove(0, 8);
                     if (groupName == normalInvitation)
                     {
-                        var information = await EnterTheGroup(invitation, groupName);
+                        var groupInformation = await EnterTheGroup(invitation, groupName);
                         SendMessage("You have joined to the group\n\r" +
                             "If you want to open chats, write: 'open'");
                         AnswerClient();
                         if (user.communication.data.ToString() == "open")
                         {
                             SendMessage("You enter to the group");
-                            return information;
+                            return groupInformation;
                         }
                         else
                         {
                             SendMessage("Ok, bye");
-                            return new string[2];
+                            return new GroupInformation { CanOpenChat = false };
                         }
                     }
                 }
                 SendMessage("Don`t have this invitation");
             }
         }
-        private async Task<string[]> EnterTheGroup(string invitation, string groupName)
+        private async Task<GroupInformation> EnterTheGroup(string invitation, string nameGroup)
         {
             string typeGroup;
             string pathGroup;
@@ -370,60 +356,31 @@ namespace Messenger
             {
                 case 'p':
                     typeGroup = "pg";
-                    pathGroup = $@"{PublicGroupsPath}\{groupName}";
+                    pathGroup = $@"{PublicGroupsPath}\{nameGroup}";
                     pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\userGroups.json";
                     break;
-                default:
+                default: //(sg)
                     typeGroup = "sg";
-                    pathGroup = $@"{SecreatGroupsPath}\{groupName}";
+                    pathGroup = $@"{SecreatGroupsPath}\{nameGroup}";
                     pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\secretGroups.json";
                     break;
             }
-            //var usersJsonSb = new StringBuilder();
-            //using (var stream = File.Open($"{pathGroup}\\users.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
-            //{
-            //    usersJsonSb = await ReadFile(stream);
-            //    var users = JsonConvert.DeserializeObject<List<string>>(usersJsonSb.ToString());
-            //    if (users != null)
-            //    {
-            //        users.Add(nickname);
-            //    }
-            //    else
-            //    {
-            //        users = new List<string>();
-            //        users.Add(nickname);
-            //    }
-            //    var usersJson = JsonConvert.SerializeObject(users);
-            //    var buffer = Encoding.Default.GetBytes(usersJson);
-            //    stream.Seek(0, SeekOrigin.Begin);
-            //    await stream.WriteAsync(buffer, 0, buffer.Length);
-            //}
-            await WriteInvitaion($"{pathGroup}\\users.json", user.Nickname);
-            await WriteInvitaion(pathUser, groupName);
+            await AddUserOrGroup($"{pathGroup}\\users.json", user.Nickname);
+            await AddUserOrGroup(pathUser, nameGroup);
             await DeleteInvitation($@"D:\temp\messenger\Users\{user.Nickname}\invitation.json", invitation);
             await DeleteInvitation($@"{pathGroup}\invitation.json", user.Nickname);
-            //using (var stream = File.Open($@"D:\temp\messenger\Users\{nickname}\invitation.json", FileMode.OpenOrCreate, FileAccess.ReadWrite))
-            //{
-            //    usersJsonSb = await ReadFile(stream);
-            //    var users = JsonConvert.DeserializeObject<List<string>>(usersJsonSb.ToString());
-            //    users.Remove(invitation);
-            //    var usersJson = JsonConvert.SerializeObject(usersJsonSb);
-            //    var buffer = Encoding.Default.GetBytes(usersJson);
-            //    await stream.WriteAsync(buffer, 0, buffer.Length);
-            //}
-            return new string[] { typeGroup, groupName, pathGroup};
+            return new GroupInformation(true, typeGroup, nameGroup, pathGroup);
         }
-        private async Task WriteInvitaion(string path, string information)
+        private async Task AddUserOrGroup(string path, string information)
         {
-            var usersJsonSb = new StringBuilder();
-            await fileMaster.ReadWrite(path, users =>
+            await fileMaster.ReadWrite(path, usersOrGroup =>
             {
-                if (users == null)
+                if (usersOrGroup == null)
                 {
-                    users = new List<string>();
+                    usersOrGroup = new List<string>();
                 }
-                users.Add(information);
-                return (users, true);
+                usersOrGroup.Add(information);
+                return (usersOrGroup, true);
             });
         }
         private async Task DeleteInvitation(string path, string invitation)
@@ -434,7 +391,7 @@ namespace Messenger
                 return (users, true);
             });
         }
-        private async Task<string[]> ChoseGroupSend(string message)
+        private async Task<GroupInformation> ChoseGroupSend(string message)
         {
             switch (message)
             {
@@ -465,11 +422,11 @@ namespace Messenger
                 case "?/ng":
                     return await CreateNewGroup();
                 default:
-                    return new string[1];
+                    return new GroupInformation() { CanOpenChat = false };
             }
-            return new string[0];
+            return new GroupInformation() { CanOpenChat = false };
         }
-        private async Task<string[]> CreateNewGroup()
+        private async Task<GroupInformation> CreateNewGroup()
         {
             CreatorGroups creatorGroups = new CreatorGroups(user);
             return await creatorGroups.Run();

@@ -62,6 +62,7 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="GroupInformation.cs" />
     <Compile Include="UserChats.cs" />
     <Compile Include="BanerUsers.cs" />
     <Compile Include="Chat.cs" />

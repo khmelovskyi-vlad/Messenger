@@ -49,10 +49,10 @@ namespace Messenger
                 while (true)
                 {
                     GroupMaster groupMaster = new GroupMaster(user);
-                    var userInformation = await groupMaster.Run();
-                    if (userInformation.Length == 3 && userInformation[0] != "")
+                    var groupInformation = await groupMaster.Run();
+                    if (groupInformation.CanOpenChat)
                     {
-                        await OpenCreateChat(user, userInformation);
+                        await OpenCreateChat(user, groupInformation);
                         if (CheckLeftMessanger(user))
                         {
                             break;
@@ -100,12 +100,12 @@ namespace Messenger
             }
             return false;
         }
-        private async Task OpenCreateChat(User user, string[] information)
+        private async Task OpenCreateChat(User user, GroupInformation groupInformation)
         {
             var findChat = false;
             foreach (var chat in chats)
             {
-                if (information[1] == chat.NameChat)
+                if (groupInformation.Name == chat.NameChat)
                 {
                     findChat = true;
                     await chat.Run(user, false);
@@ -115,7 +115,7 @@ namespace Messenger
             }
             if (!findChat)
             {
-                Chat chat = new Chat(information[0], information[1], information[2]);
+                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path);
                 chats.Add(chat);
                 await chat.Run(user, true);
                 CheckOnline(chat);

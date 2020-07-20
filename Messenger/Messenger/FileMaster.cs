@@ -16,25 +16,7 @@ namespace Messenger
 
         }
 
-        public async Task AddUser(string path, string nick)
-        {
-            using (var stream = File.Open(path, FileMode.Create, FileAccess.Write))
-            {
-                var users = new List<string> { nick };
-                var peopleChatsBeenJson = JsonConvert.SerializeObject(users);
-                var buffer = Encoding.Default.GetBytes(peopleChatsBeenJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
-        public async Task WriteInvite(string path, List<string> invitedPeople)
-        {
-            using (var stream = File.Open(path, FileMode.CreateNew, FileAccess.Write))
-            {
-                var invitedPeopleJson = JsonConvert.SerializeObject(invitedPeople);
-                var buffer = Encoding.Default.GetBytes(invitedPeopleJson);
-                await stream.WriteAsync(buffer, 0, buffer.Length);
-            }
-        }
+
         public void DeleterFolder(string path)
         {
             Directory.Delete(path, true);

@@ -32,6 +32,14 @@ namespace Messenger
         public List<string> UserGroups;
         public List<string> PublicGroups;
         public List<string> Invitations;
+        public async Task<List<PersonChat>> FindPersonChats()
+        {
+            return (await fileMaster.ReadAndDesToPersonCh($@"{userFoldersPath}\{nick}\peopleChatsBeen.json")) ?? new List<PersonChat>();
+        }
+        public async Task FindInvitations()
+        {
+            Invitations = await fileMaster.ReadAndDesToLString($@"{userFoldersPath}\{nick}\invitation.json");
+        }
         public async Task FindAllChats()
         {
             ChatsWithPeople = ((await fileMaster.ReadAndDesToPersonCh($@"{userFoldersPath}\{nick}\peopleChatsBeen.json"))
@@ -49,7 +57,7 @@ namespace Messenger
             PublicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup")
                 .Select(path => fileMaster.GetFileName(path))
                 .ToList();
-            Invitations = await fileMaster.ReadAndDesToLString($@"{userFoldersPath}\{nick}\invitation.json");
+            await FindInvitations();
             //AllChats = new List<List<string>> { ChatsWithPeople, AllPeople, SecretGroups, UserGroups, PublicGroups, Invitations }
             //.SelectMany(x => x)
             //.ToList();

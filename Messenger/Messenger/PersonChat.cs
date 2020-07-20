@@ -6,7 +6,7 @@ using System.Threading.Tasks;
 
 namespace Messenger
 {
-    class PersonChat
+    struct PersonChat
     {
         public PersonChat(string[] nickname, string nameChat)
         {

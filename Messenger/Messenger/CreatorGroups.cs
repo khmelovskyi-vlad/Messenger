@@ -85,7 +85,7 @@ namespace Messenger
                         .Contains(nameGroup);
             }
         }
-        public async Task<string[]> Run()
+        public async Task<GroupInformation> Run()
         {
             var typeGroup = SelectTypeGroup();
             var nameGroup = SelectGroupName(typeGroup);
@@ -142,7 +142,7 @@ namespace Messenger
         {
             return !invitedPeople.Contains(nick);
         }
-        private async Task<string[]> CreateNewGroup(string nameGroup, string typeGroup, List<string> invitedPeople)
+        private async Task<GroupInformation> CreateNewGroup(string nameGroup, string typeGroup, List<string> invitedPeople)
         {
             var pathGroup = await AddGroup(nameGroup, typeGroup, invitedPeople);
             await InvitePeople(invitedPeople, nameGroup, typeGroup);
@@ -151,9 +151,9 @@ namespace Messenger
             AnswerClient();
             if (user.communication.data.ToString() == "ok")
             {
-                return new string[] { typeGroup, nameGroup, pathGroup };
+                return new GroupInformation (true, typeGroup, nameGroup, pathGroup );
             }
-            return new string[] { "", nameGroup, pathGroup };
+            return new GroupInformation(false, typeGroup, nameGroup, pathGroup);
         }
         private bool CheckPeople(IEnumerable<string> people, string nick)
         {
@@ -172,8 +172,24 @@ namespace Messenger
                     break;
             }
             fileMaster.CreateDirectory(pathGroup);
-            await fileMaster.AddUser($"{pathGroup}\\users.json", user.Nickname);
-            await fileMaster.WriteInvite($"{pathGroup}\\invitation.json", invitedPeople);
+            await fileMaster.ReadWrite($"{pathGroup}\\users.json", users =>
+            {
+                if (users == null)
+                {
+                    users = new List<string>();
+                }
+                users.Add(user.Nickname);
+                return (users, true);
+            });
+            await fileMaster.ReadWrite($"{pathGroup}\\invitation.json", allInvitedPeople =>
+            {
+                if (allInvitedPeople == null)
+                {
+                    allInvitedPeople = new List<string>();
+                }
+                allInvitedPeople.AddRange(invitedPeople);
+                return (allInvitedPeople, true);
+            });
             return pathGroup;
         }
         private async Task InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
