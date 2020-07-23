@@ -43,6 +43,7 @@ namespace Messenger
         const int size = 256;
         private object lockObj = new object();
         private List<string> messages;
+        private object messagesLock = new object();
         private string PathChat;
         private string message;
         FileMaster fileMaster = new FileMaster();
@@ -50,10 +51,10 @@ namespace Messenger
         public async Task Run(User user, bool firstConnect)
         {
             //Interlocked.Add()
-            user.communication.SendMessage(TypeChat, user.Socket);
-            user.communication.AnswerClient(user.Socket);
-            user.communication.SendMessage(message, user.Socket);
-            user.communication.AnswerClient(user.Socket);
+            user.communication.SendMessage(TypeChat);
+            user.communication.AnswerClient();
+            user.communication.SendMessage(message);
+            user.communication.AnswerClient();
             if (firstConnect)
             {
                 await FirstRead();
@@ -62,7 +63,7 @@ namespace Messenger
             UsersOnline.Add(user);
             while (true)
             {
-                user.communication.AnswerClient(user.Socket);
+                user.communication.AnswerClient();
                 var message = user.communication.data.ToString();
                 switch (message)
                 {
@@ -510,7 +511,7 @@ namespace Messenger
             while (true)
             {
                 user.communication.SendMessage("Write user nickname");
-                user.communication.AnswerClient(user.Socket);
+                user.communication.AnswerClient();
                 var nickname = user.communication.data.ToString();
                 if (await CheckHavingNick(nickname))
                 {
@@ -548,12 +549,15 @@ namespace Messenger
         }
         private void FirstSentMessage(List<string> messages, User user)
         {
-            user.communication.SendMessage(messages.Count.ToString(), user.Socket);
-            user.communication.AnswerClient(user.Socket);
-            foreach (var message in messages)
+            lock (messagesLock)
             {
-                user.communication.SendMessage(message, user.Socket);
-                user.communication.AnswerClient(user.Socket);
+                user.communication.SendMessage(messages.Count.ToString());
+                user.communication.AnswerClient();
+                foreach (var message in messages)
+                {
+                    user.communication.SendMessage(message);
+                    user.communication.AnswerClient();
+                }
             }
         }
         private void CheckFile()
@@ -584,8 +588,12 @@ namespace Messenger
         {
             using (var stream = File.Open($"{PathChat}\\data.json", FileMode.Open, FileAccess.Write))
             {
-                messages.Add(message);
-                var messagesJson = JsonConvert.SerializeObject(messages);
+                var messagesJson = "";
+                lock (messagesLock)
+                {
+                    messages.Add(message);
+                    messagesJson = JsonConvert.SerializeObject(messages);
+                }
                 var buffer = Encoding.Default.GetBytes(messagesJson);
                 stream.Seek(0, SeekOrigin.Begin);
                 await stream.WriteAsync(buffer, 0, buffer.Length);
@@ -593,12 +601,7 @@ namespace Messenger
         }
         private async Task FirstRead()
         {
-            var messages = await fileMaster.ReadAndDesToLString($"{PathChat}\\data.json");
-            if (messages == null)
-            {
-                messages = new List<string>();
-            }
-            this.messages = messages;
+            this.messages = await fileMaster.ReadAndDesToLString($"{PathChat}\\data.json") ?? new List<string>();
         }
 
 

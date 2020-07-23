@@ -7,6 +7,7 @@ using System.Diagnostics;
 using Newtonsoft.Json;
 using System.IO;
 using System.Threading;
+using System.IO.Pipes;
 
 namespace Messenger
 {
@@ -78,8 +79,102 @@ namespace Messenger
 
             return result;
         }
+        static void serverr()
+        {
+            Process adder = new Process();
+            adder.StartInfo.FileName = "Messenger.exe";
+            adder.StartInfo.UseShellExecute = false;
+            adder.StartInfo.RedirectStandardOutput = true;
+            using (AnonymousPipeServerStream serverPipe = new AnonymousPipeServerStream(PipeDirection.Out, HandleInheritability.Inheritable, 100))
+            {
+                adder.StartInfo.Arguments = serverPipe.GetClientHandleAsString();//arguments are passed thru the funnel extended by client.
+                adder.Start();
+                serverPipe.DisposeLocalCopyOfClientHandle();
+                serverPipe.Write(System.Text.Encoding.UTF8.GetBytes("3 4"), 0, System.Text.Encoding.UTF8.GetByteCount("3 4"));
+            }
+            StreamReader reader = adder.StandardOutput;
+            Console.WriteLine("Sever:Adder:{0}", reader.ReadToEnd());
+            adder.WaitForExit();
+        }
+        private async static Task TestPipeMessenger()
+        {
+            Process pipeClient = new Process();
+            pipeClient.StartInfo.FileName = "Messenger.exe";
+            pipeClient.StartInfo.Arguments = "1";
+            pipeClient.Start();
+
+            using (NamedPipeServerStream pipeServer =
+                new NamedPipeServerStream("testpipe", PipeDirection.Out, 1, PipeTransmissionMode.Message, PipeOptions.Asynchronous))
+            {
+                Console.WriteLine("NamedPipeServerStream object created.");
+
+                // Wait for a client to connect
+                Console.Write("Waiting for client connection...");
+                pipeServer.WaitForConnection();
+
+                Console.WriteLine("Client connected.");
+                try
+                {
+                    // Read user input and send that to the client process.
+                    using (StreamWriter sw = new StreamWriter(pipeServer))
+                    {
+                        sw.AutoFlush = true;
+                        while (true)
+                        {
+                            Console.Write("Enter text: ");
+                            var line = Console.ReadLine();
+                            await sw.WriteLineAsync(line);
+                            if (line == "all")
+                            {
+                                break;
+                            }
+                        }
+                    }
+                }
+                // Catch the IOException that is raised if the pipe is broken
+                // or disconnected.
+                catch (IOException e)
+                {
+                    Console.WriteLine("ERROR: {0}", e.Message);
+                }
+            }
+        }
+        private async static Task TestPipeClient(string[] args)
+        {
+            using (NamedPipeClientStream pipeClient =
+                new NamedPipeClientStream(".", "testpipe", PipeDirection.In, PipeOptions.Asynchronous))
+            {
+
+                // Connect to the pipe or wait until the pipe is available.
+                Console.Write("Attempting to connect to pipe...");
+                pipeClient.Connect();
+
+                Console.WriteLine("Connected to pipe.");
+                Console.WriteLine("There are currently {0} pipe server instances open.",
+                   pipeClient.NumberOfServerInstances);
+                using (StreamReader sr = new StreamReader(pipeClient))
+                {
+                    // Display the read text to the console
+                    string temp;
+                    while ((temp = await sr.ReadLineAsync()) != null)
+                    {
+                        Console.WriteLine("Received from server: {0}", temp);
+                    }
+                }
+            }
+            Console.Write("Press Enter to continue...");
+            Console.ReadLine();
+        }
         static async Task<int> Main(string[] args)
         {
+            //if (args.Length == 0)
+            //{
+            //    await TestPipeMessenger();
+            //}
+            //else if (args[0] == "1")
+            //{
+            //    await TestPipeClient(args);
+            //}
             var first = new int[] { 1, 2, 3, 4 };
             var second = new int[] { 2, 5 };
             var three = first.Except(second);
