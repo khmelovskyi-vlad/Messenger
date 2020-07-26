@@ -73,18 +73,21 @@ namespace Messenger
         }
         private bool CheckLeftMessanger(User user)
         {
-            user.communication.SendMessage("If you want left the messanger, write: exit");
+            var result = true;
+            user.communication.AnswerClient();
+            user.communication.SendMessage("If you want to left the messanger, write: 'exit'");
             user.communication.AnswerClient();
             if (user.communication.data.ToString() == "exit")
             {
                 user.communication.SendMessage("You left the messanger");
-                return true;
             }
             else
             {
                 user.communication.SendMessage("Ok, choose new chat");
-                return false;
+                result = false;
             }
+            user.communication.AnswerClient();
+            return result;
         }
         private bool CheckOnline(string nickname, Socket listener)
         {

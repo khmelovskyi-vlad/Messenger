@@ -21,8 +21,8 @@ namespace Messenger
         private FileMaster fileMaster;
         public async Task Run()
         {
-            var pathElement = "";
             var invitationName = "";
+            var pathElement = "";
             if (typeChat == "pg" || typeChat == "ug")
             {
                 invitationName = $"public: {NameChat}";
@@ -38,22 +38,27 @@ namespace Messenger
                 pathElement = "leavedPeopleChatsBeen";
             }
 
-
-            var invitationPaths = await FindUserPath($"{pathChat}\\invitation.json", "\\invitation.json");
-            if (invitationPaths != null)
+            if (invitationName != "")
             {
-                await DeleteExtraData(invitationPaths, invitationName);
+                var invitationPaths = await FindUserPath($"{pathChat}\\invitation.json", "\\invitation.json");
+                if (invitationPaths != null || invitationPaths.Count() != 0)
+                {
+                    await DeleteExtraData(invitationPaths, invitationName);
+                }
             }
             var leavedPaths = await FindUserPath($"{pathChat}\\leavedPeople.json", $"\\{pathElement}.json");
-            if (leavedPaths != null)
+            if (leavedPaths != null || leavedPaths.Count() != 0)
             {
                 if (typeChat == "pp" || typeChat == "ch")
                 {
                     await DeleteLeavedPeople(leavedPaths);
-                    return;
                 }
-                await DeleteExtraData(leavedPaths, NameChat);
+                else
+                {
+                    await DeleteExtraData(leavedPaths, NameChat);
+                }
             }
+            fileMaster.DeleterFolder(pathChat);
         }
         private async Task DeleteLeavedPeople(List<string> paths)
         {
@@ -61,17 +66,9 @@ namespace Messenger
             {
                 await fileMaster.ReadWrite(path, nameChats =>
                 {
-                    var needChat = new PersonChat(new string[0], "");
-                    foreach (var nameChat in nameChats)
-                    {
-                        if (nameChat.NameChat == NameChat)
-                        {
-                            needChat = nameChat;
-                            break;
-                        }
-                    }
-                    nameChats.Remove(needChat);
-                    return (nameChats, true);
+                    return ((nameChats ?? new List<PersonChat>())
+                    .Where(chat => chat.NameChat != NameChat)
+                    .ToList(), true);
                 });
             }
         }
@@ -88,17 +85,10 @@ namespace Messenger
         }
         private async Task<List<string>> FindUserPath(string path, string lastPartOfPath)
         {
-            var leavedPaths = new List<string>();
-            var users = await fileMaster.ReadAndDesToLString(path);
-            if (users == null)
-            {
-                return null;
-            }
-            foreach (var user in users)
-            {
-                leavedPaths.Add($@"D:\temp\messenger\Users\{user}{lastPartOfPath}");
-            }
-            return leavedPaths;
+            return ((await fileMaster.ReadAndDesToLString(path))
+                ?? new List<string>())
+                .Select(user => $@"D:\temp\messenger\Users\{user}{lastPartOfPath}")
+                .ToList();
         }
     }
 }
