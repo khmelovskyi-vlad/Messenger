@@ -84,16 +84,16 @@ namespace Messenger
         }
         private async Task DeleteUser()
         {
-            var foundNick = await FindNeedNick();
-            if (foundNick)
+            if (await FindNeedNick())
             {
                 lock (messenger.locketOnline)
                 {
-                    foreach (var user in messenger.online)
+                    foreach (var userOnline in messenger.online)
                     {
-                        if (user.Nickname == this.user.Nickname)
+                        if (userOnline.Nickname == user.Nickname)
                         {
-                            user.communication.EndTask = true;
+                            userOnline.communication.EndTask = true;
+                            break;
                         }
                     }
                 }
@@ -239,11 +239,12 @@ namespace Messenger
         {
             lock (messenger.locketOnline)
             {
-                foreach (var user in messenger.online)
+                foreach (var userOnline in messenger.online)
                 {
-                    if (user.Nickname == this.user.Nickname)
+                    if (userOnline.Nickname == user.Nickname)
                     {
-                        user.communication.EndTask = true;
+                        userOnline.communication.EndTask = true;
+                        break;
                     }
                 }
             }
@@ -402,6 +403,10 @@ namespace Messenger
         {
             return await fileMaster.ReadWrite(NicknamesAndPasswordsPath, users =>
             {
+                if (users == null)
+                {
+                    users = new List<UserNicknameAndPasswordAndIPs>();
+                }
                 var findUser = false;
                 foreach (var user in users)
                 {

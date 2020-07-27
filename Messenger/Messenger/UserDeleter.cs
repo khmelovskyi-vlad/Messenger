@@ -18,25 +18,38 @@ namespace Messenger
             this.fileMaster = fileMaster;
         }
         private FileMaster fileMaster;
-        private string user;
+        private string userNickname;
         public async Task Run(string nick, bool needChangeMessages)
         {
-            user = nick;
-            await DeleteData(PublicGroupsPath, $@"{Users}\{user}\userGroups.json", $@"{Users}\{user}\leavedUserGroups.json", "ug", needChangeMessages);
-            await DeleteData(SecretGroupsPath, $@"{Users}\{user}\secretGroups.json", $@"{Users}\{user}\leavedSecretGroups.json", "sg", needChangeMessages);
-            await DeleteData(PeopleChatsPath, $@"{Users}\{user}\peopleChatsBeen.json", $@"{Users}\{user}\leavedPeopleChatsBeen.json", "pp", needChangeMessages);
+            userNickname = nick;
+            await DeleteData(PublicGroupsPath,
+                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\userGroups.json"),
+                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\leavedUserGroups.json"),
+                "ug",
+                needChangeMessages);
+
+            await DeleteData(SecretGroupsPath,
+                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\secretGroups.json"),
+                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\leavedSecretGroups.json"),
+                "sg",
+                needChangeMessages);
+            await DeleteData(PeopleChatsPath,
+                ((await fileMaster.ReadAndDesToPersonCh($@"{Users}\{userNickname}\peopleChatsBeen.json"))
+                ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
+                ((await fileMaster.ReadAndDesToPersonCh($@"{Users}\{userNickname}\leavedPeopleChatsBeen.json"))
+                ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
+                "pp",
+                needChangeMessages);
             await DeleteInvitations();
         }
-        private async Task DeleteData(string pathTypeGroup, string pathUseGroups, string pathLeavedGroups, string typeGroups, bool needChangeMessages)
+        private async Task DeleteData(string pathTypeGroup, List<string> groups, List<string> leavedGroups, string typeGroups, bool needChangeMessages)
         {
-            var groups = await fileMaster.ReadAndDesToLString(pathUseGroups);
-            var leavedGroups = await fileMaster.ReadAndDesToLString(pathLeavedGroups);
             if (needChangeMessages)
             {
                 await ChangeMessages(pathTypeGroup, groups, leavedGroups);
             }
-            await DeleteNickInGroups(groups, pathTypeGroup, "users.json", typeGroups);
             await DeleteNickInGroups(leavedGroups, pathTypeGroup, "leavedPeople.json", typeGroups);
+            await DeleteNickInGroups(groups, pathTypeGroup, "users.json", typeGroups);
             //fileMaster.DeleterFolder($"{Users}\\{user}");
         }
         private async Task DeleteNickInGroups(List<string> groupNames, string firstPartOfThePast, string lastPartOfThePast, string typeGroups)
@@ -49,7 +62,7 @@ namespace Messenger
                     var needDeleteGroup = false;
                     await fileMaster.ReadWrite(path, (users) =>
                     {
-                        users.Remove(user);
+                        users.Remove(userNickname);
                         if (lastPartOfThePast == "users.json")
                         {
                             if (users.Count == 0)
@@ -105,25 +118,18 @@ namespace Messenger
             //var messages = await fileMaster.ReadAndDesToLString(path);
             await fileMaster.ReadWrite(path, (messages) =>
             {
-                var newMessages = new List<string>();
                 if (messages != null)
                 {
-                    foreach (var message in messages)
-                    {
-                        if (user == message.Remove(user.Length))
-                        {
-                            newMessages.Add($"{user} was banned");
-                            continue;
-                        }
-                        newMessages.Add(message);
-                    }
+                    return (messages.
+                    Select(message => userNickname == message.Remove(userNickname.Length) ? $"{userNickname} was banned" : message)
+                    .ToList(), true);
                 }
-                return (newMessages, true);
+                return (messages, false);
             });
         }
         private async Task DeleteInvitations()
         {
-            var invitations = await fileMaster.ReadAndDesToLString($@"{Users}\{user}\invitation.json");
+            var invitations = await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\invitation.json");
             if (invitations != null)
             {
                 foreach (var invitation in invitations)
@@ -143,7 +149,11 @@ namespace Messenger
                     }
                     await fileMaster.ReadWrite(path, (users) =>
                     {
-                        users.Remove(user);
+                        if (users == null)
+                        {
+                            users = new List<string>();
+                        }
+                        users.Remove(userNickname);
                         return (users, true);
                     });
                 }

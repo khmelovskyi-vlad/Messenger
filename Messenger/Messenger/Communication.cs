@@ -22,9 +22,13 @@ namespace Messenger
         const int size = 256;
         AutoResetEvent resetSend = new AutoResetEvent(false);
         AutoResetEvent resetReceive = new AutoResetEvent(false);
+        public void SendMessageAndAnswerClient(string message)
+        {
+            SendMessage(message);
+            AnswerClient();
+        }
         public void AnswerClient(Socket listener)
         {
-            CheckEndTask(listener);
             buffer = new byte[size];
             data = new StringBuilder();
             do
@@ -32,10 +36,10 @@ namespace Messenger
                 listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
                 resetReceive.WaitOne();
             } while (listener.Available > 0);
+            CheckEndTask(listener);
         }
         public void AnswerClient()
         {
-            CheckEndTask(listener);
             buffer = new byte[size];
             data = new StringBuilder();
             do
@@ -43,6 +47,7 @@ namespace Messenger
                 listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
                 resetReceive.WaitOne();
             } while (listener.Available > 0);
+            CheckEndTask(listener);
         }
         private void ReceiveCallback(IAsyncResult AR)
         {
