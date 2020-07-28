@@ -71,7 +71,7 @@ namespace Messenger
         {
             if (EndTask == true)
             {
-                byte[] byteData = Encoding.ASCII.GetBytes("You are in ban, bye");
+                byte[] byteData = Encoding.ASCII.GetBytes("?/you left the chat");
                 listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
                 resetSend.WaitOne();
                 throw new OperationCanceledException();

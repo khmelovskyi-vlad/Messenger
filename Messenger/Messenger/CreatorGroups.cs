@@ -172,24 +172,8 @@ namespace Messenger
                     break;
             }
             fileMaster.CreateDirectory(pathGroup);
-            await fileMaster.ReadWrite($"{pathGroup}\\users.json", users =>
-            {
-                if (users == null)
-                {
-                    users = new List<string>();
-                }
-                users.Add(user.Nickname);
-                return (users, true);
-            });
-            await fileMaster.ReadWrite($"{pathGroup}\\invitation.json", allInvitedPeople =>
-            {
-                if (allInvitedPeople == null)
-                {
-                    allInvitedPeople = new List<string>();
-                }
-                allInvitedPeople.AddRange(invitedPeople);
-                return (allInvitedPeople, true);
-            });
+            await fileMaster.ReadWrite($"{pathGroup}\\users.json", fileMaster.AddData(user.Nickname));
+            await fileMaster.ReadWrite($"{pathGroup}\\invitation.json", fileMaster.AddSomeData(invitedPeople));
             return pathGroup;
         }
         private async Task InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
@@ -210,26 +194,20 @@ namespace Messenger
         }
         private async Task ReadWriteInvitationOrGroup(string path, string nameGroup, string typeGroup)
         {
-            await fileMaster.ReadWrite(path, usersInvitation =>
+            string data;
+            if (typeGroup == "pg")
             {
-                if (usersInvitation == null)
-                {
-                    usersInvitation = new List<string>();
-                }
-                if (typeGroup == "pg")
-                {
-                    usersInvitation.Add($"public: {nameGroup}");
-                }
-                else if (typeGroup == "sg")
-                {
-                    usersInvitation.Add($"secret: {nameGroup}");
-                }
-                else
-                {
-                    usersInvitation.Add(nameGroup);
-                }
-                return (usersInvitation, true);
-            });
+                data = $"public: {nameGroup}";
+            }
+            else if (typeGroup == "sg")
+            {
+                data = $"secret: {nameGroup}";
+            }
+            else
+            {
+                data = nameGroup;
+            }
+            await fileMaster.ReadWrite(path, fileMaster.AddData(data));
         }
         private void SendGroups(IEnumerable<string> groups, string firstMassage)
         {
@@ -251,7 +229,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindChatsPeople()
         {
-            return ((await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Where(nickname => nickname != user.Nickname)

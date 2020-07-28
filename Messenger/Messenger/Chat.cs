@@ -23,9 +23,6 @@ namespace Messenger
         public List<User> UsersOnline = new List<User>();
         public List<User> UsersOnlineToCheck = new List<User>();
         private string TypeChat { get; set; }
-        private StringBuilder data;
-        private byte[] buffer;
-        const int size = 256;
         private List<string> messages;
         private object messagesLock = new object();
         private string PathChat;
@@ -179,24 +176,8 @@ namespace Messenger
                     partInvitation = "";
                     break;
             }
-            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{namePerson}\invitation.json", userInvitations =>
-            {
-                if (userInvitations == null)
-                {
-                    userInvitations = new List<string>();
-                }
-                userInvitations.Add($"{partInvitation}{NameChat}");
-                return (userInvitations, true);
-            });
-            await fileMaster.ReadWrite($@"{PathChat}\invitation.json", groupInvitations =>
-            {
-                if (groupInvitations == null)
-                {
-                    groupInvitations = new List<string>();
-                }
-                groupInvitations.Add(namePerson);
-                return (groupInvitations, true);
-            });
+            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{namePerson}\invitation.json", fileMaster.AddData($"{partInvitation}{NameChat}"));
+            await fileMaster.ReadWrite($@"{PathChat}\invitation.json", fileMaster.AddData(namePerson));
         }
         private async Task WriteData(string path, string data)
         {
@@ -207,7 +188,7 @@ namespace Messenger
         }
         private async Task<bool> CheckPerson(string namePerson)
         {
-            return ((await fileMaster.ReadAndDesToLUserInf(@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Contains(namePerson);
@@ -232,7 +213,7 @@ namespace Messenger
             return true;
             async Task<bool> CheckUsersLeavedPeopleInvitation(string path)
             {
-                var users = await fileMaster.ReadAndDesToLString(path);
+                var users = await fileMaster.ReadAndDeserialize<string>(path);
                 if (users == null)
                 {
                     users = new List<string>();
@@ -307,15 +288,7 @@ namespace Messenger
         }
         private async Task AddInvitation(string path, string data)
         {
-            await fileMaster.ReadWrite(path, invitations =>
-            {
-                if (invitations == null)
-                {
-                    invitations = new List<string>();
-                }
-                invitations.Add(data);
-                return (invitations, true);
-            });
+            await fileMaster.ReadWrite(path, fileMaster.AddData(data));
         }
         private async Task AddUserToGroups(string userPath, string nameGroup, string typeGroup, User user)
         {
@@ -331,23 +304,15 @@ namespace Messenger
                 default:
                     return;
             }
-            await fileMaster.ReadWrite($"{userPath}\\{partPath}", groups =>
-            {
-                if (groups == null)
-                {
-                    groups = new List<string>();
-                }
-                groups.Add(nameGroup);
-                return (groups, true);
-            });
-            await fileMaster.ReadWrite($"{PathChat}\\users.json", users =>
+            await fileMaster.ReadWrite($"{userPath}\\{partPath}", fileMaster.AddData(nameGroup));
+            await fileMaster.ReadWrite<string>($"{PathChat}\\users.json", users =>
             {
                 return (new List<string>() { user.Nickname }, true);
             });
         }
         private async Task<string> FindAnotherUser(User user)
         {
-            return (await fileMaster.ReadAndDesToLString($"{PathChat}\\users.json"))
+            return (await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\users.json"))
                 .Where(x => x != user.Nickname)
                 .FirstOrDefault();
         }
@@ -355,7 +320,7 @@ namespace Messenger
         {
             foreach (var userPath in usersPath)
             {
-                await fileMaster.ReadWrite($"{userPath}\\peopleChatsBeen.json", groups =>
+                await fileMaster.ReadWrite<PersonChat>($"{userPath}\\peopleChatsBeen.json", groups =>
                 {
                     return (groups.Where(group => group.NameChat != NameChat).ToList(), true);
                 });
@@ -504,7 +469,7 @@ namespace Messenger
         }
         private async Task<bool> CheckHavingNick(string nickname)
         {
-            return ((await fileMaster.ReadAndDesToLString($"{PathChat}\\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\users.json"))
                 ?? new List<string>())
                 .Contains(nickname);
         }
@@ -541,19 +506,11 @@ namespace Messenger
         }
         private async Task SaveMessage(string message)
         {
-            await fileMaster.ReadWrite($"{PathChat}\\data.json", (fileMessages) =>
-            {
-                if (fileMessages == null)
-                {
-                    fileMessages = new List<string>();
-                }
-                fileMessages.Add(message);
-                return (fileMessages, true);
-            });
+            await fileMaster.ReadWrite($"{PathChat}\\data.json", fileMaster.AddData(message));
         }
         private async Task FirstRead()
         {
-            this.messages = await fileMaster.ReadAndDesToLString($"{PathChat}\\data.json") ?? new List<string>();
+            this.messages = await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\data.json") ?? new List<string>();
         }
 
 

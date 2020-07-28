@@ -12,7 +12,7 @@ namespace Messenger
         private const string PublicGroupsPath = @"D:\temp\messenger\publicGroup";
         private const string SecretGroupsPath = @"D:\temp\messenger\secretGroup";
         private const string PeopleChatsPath = @"D:\temp\messenger\peopleChats";
-        private const string Users = @"D:\temp\messenger\Users";
+        private const string UsersPath = @"D:\temp\messenger\Users";
         public UserDeleter(FileMaster fileMaster)
         {
             this.fileMaster = fileMaster;
@@ -23,24 +23,25 @@ namespace Messenger
         {
             userNickname = nick;
             await DeleteData(PublicGroupsPath,
-                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\userGroups.json"),
-                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\leavedUserGroups.json"),
+                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\userGroups.json"),
+                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\leavedUserGroups.json"),
                 "ug",
                 needChangeMessages);
 
             await DeleteData(SecretGroupsPath,
-                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\secretGroups.json"),
-                await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\leavedSecretGroups.json"),
+                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\secretGroups.json"),
+                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\leavedSecretGroups.json"),
                 "sg",
                 needChangeMessages);
             await DeleteData(PeopleChatsPath,
-                ((await fileMaster.ReadAndDesToPersonCh($@"{Users}\{userNickname}\peopleChatsBeen.json"))
+                ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{UsersPath}\{userNickname}\peopleChatsBeen.json"))
                 ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
-                ((await fileMaster.ReadAndDesToPersonCh($@"{Users}\{userNickname}\leavedPeopleChatsBeen.json"))
+                ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{UsersPath}\{userNickname}\leavedPeopleChatsBeen.json"))
                 ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
                 "pp",
                 needChangeMessages);
             await DeleteInvitations();
+            //fileMaster.DeleterFolder($"{Users}\\{user}");
         }
         private async Task DeleteData(string pathTypeGroup, List<string> groups, List<string> leavedGroups, string typeGroups, bool needChangeMessages)
         {
@@ -50,7 +51,6 @@ namespace Messenger
             }
             await DeleteNickInGroups(leavedGroups, pathTypeGroup, "leavedPeople.json", typeGroups);
             await DeleteNickInGroups(groups, pathTypeGroup, "users.json", typeGroups);
-            //fileMaster.DeleterFolder($"{Users}\\{user}");
         }
         private async Task DeleteNickInGroups(List<string> groupNames, string firstPartOfThePast, string lastPartOfThePast, string typeGroups)
         {
@@ -60,7 +60,7 @@ namespace Messenger
                 {
                     var path = $"{firstPartOfThePast}\\{groupName}\\{lastPartOfThePast}";
                     var needDeleteGroup = false;
-                    await fileMaster.ReadWrite(path, (users) =>
+                    await fileMaster.ReadWrite<string>(path, (users) =>
                     {
                         users.Remove(userNickname);
                         if (lastPartOfThePast == "users.json")
@@ -85,22 +85,6 @@ namespace Messenger
         {
             await ChangeMessages(path, firstGroups);
             await ChangeMessages(path, secondGroups);
-            //if (firstGroups != null)
-            //{
-            //    var firstGroupsPaths = firstGroups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
-            //    foreach (var firstGroupPath in firstGroupsPaths)
-            //    {
-            //        await ReadWriteData(firstGroupPath);
-            //    }
-            //}
-            //if (secondGroups != null)
-            //{
-            //    var SecondGroupsPaths = secondGroups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
-            //    foreach (var SecondGroupPath in SecondGroupsPaths)
-            //    {
-            //        await ReadWriteData(SecondGroupPath);
-            //    }
-            //}
         }
         private async Task ChangeMessages(string path, List<string> groups)
         {
@@ -115,8 +99,7 @@ namespace Messenger
         }
         private async Task ReadWriteData(string path)
         {
-            //var messages = await fileMaster.ReadAndDesToLString(path);
-            await fileMaster.ReadWrite(path, (messages) =>
+            await fileMaster.ReadWrite<string>(path, (messages) =>
             {
                 if (messages != null)
                 {
@@ -129,7 +112,7 @@ namespace Messenger
         }
         private async Task DeleteInvitations()
         {
-            var invitations = await fileMaster.ReadAndDesToLString($@"{Users}\{userNickname}\invitation.json");
+            var invitations = await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\invitation.json");
             if (invitations != null)
             {
                 foreach (var invitation in invitations)
@@ -147,7 +130,7 @@ namespace Messenger
                             path = "";
                             break;
                     }
-                    await fileMaster.ReadWrite(path, (users) =>
+                    await fileMaster.ReadWrite<string>(path, (users) =>
                     {
                         if (users == null)
                         {

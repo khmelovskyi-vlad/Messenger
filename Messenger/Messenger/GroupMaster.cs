@@ -26,27 +26,8 @@ namespace Messenger
         {
             userChats = new UserChats(fileMaster, user.Nickname, UserFoldersPath, PublicGroupsPath, SecreatGroupsPath, PeopleChatsPath);
             await userChats.FindAllChats();
-            //var enteringChats = await FindAllChats();
             SendChats(false);
-            //communication.SendMessage("If you want to leave the group write 'leave'\n\r" +
-            //    "If you want to choose the group write 'choose'", listener);
-            //communication.AnswerClient(listener);
-            //while (true)
-            //{
-            //    if (communication.data.ToString() == "Select the group you want to leave")
-            //    {
-            //        communication.SendMessage("Choose group", listener);
-            //        communication.AnswerClient(listener);
-            //        GroupsLeaver groupsLeaver = new GroupsLeaver();
-
-            //    }
-            //    else if(communication.data.ToString() == "choose")
-            //    {
-            //        communication.SendMessage("Choose group", listener);
-            //        communication.AnswerClient(listener);
-                    return await ModeSelection();
-            //    }
-            //}
+            return await ModeSelection();
         }
         private async Task<GroupInformation> ModeSelection()
         {
@@ -142,11 +123,6 @@ namespace Messenger
         }
         private async Task<GroupInformation> CreateChat(string namePerson, List<string> people, string typeGroup)
         {
-            //var pathAndName = await CheckPeopleChats(namePerson);
-            //if (pathAndName[0] != "")
-            //{
-            //    return pathAndName;
-            //}
             var nameChat = $"{namePerson} {user.Nickname}";
             PersonChat personChat = new PersonChat(new string[] { namePerson, user.Nickname }, nameChat);
             WriteNewPerson($@"D:\temp\messenger\Users\{user.Nickname}\peopleChatsBeen.json", personChat);
@@ -157,38 +133,9 @@ namespace Messenger
             await AddData($"{path}\\users.json", namePerson);
             return new GroupInformation(true, typeGroup, nameChat, path);
         }
-        //private async Task<string[]> CheckPeopleChats(string namePerson)
-        //{
-        //    List<PersonChat> groups;
-        //    using (var stream = File.Open($@"D:\temp\messenger\Users\{nickname}\peopleChatsBeen.json", FileMode.OpenOrCreate, FileAccess.Read))
-        //    {
-        //        var groupsJsonSB = await ReadFile(stream);
-        //        groups = JsonConvert.DeserializeObject<List<PersonChat>>(groupsJsonSB.ToString());
-        //    }
-        //    if (groups == null || groups.Count == 0)
-        //    {
-        //        return new string[] { "","" };
-        //    }
-        //    foreach (var group in groups)
-        //    {
-        //        if (group.Nicknames[0] == namePerson || group.Nicknames[1] == namePerson)
-        //        {
-        //            return new string[] { $@"D:\temp\messenger\peopleChats\{group.NameChat}", group.NameChat};
-        //        }
-        //    }
-        //    return new string[] { "", "" };
-        //}
         private async void WriteNewPerson(string path, PersonChat personChat)
         {
-            await fileMaster.ReadWrite(path, peopleChatsBeen =>
-            {
-                if (peopleChatsBeen == null)
-                {
-                    peopleChatsBeen = new List<PersonChat>();
-                }
-                peopleChatsBeen.Add(personChat);
-                return (peopleChatsBeen, true);
-            });
+            await fileMaster.ReadWrite(path, fileMaster.AddData(personChat));
         }
         private async Task<GroupInformation> CheckChatAndCreatePath(string nameGroup, string typeGroup)
         {
@@ -219,7 +166,7 @@ namespace Messenger
                     needAddUser = true;
                     break;
             }
-            if (groups != null/* && groups.Count != 0 */)
+            if (groups != null/* || groups.Count != 0 */)
             {
                 foreach (var group in groups)
                 {
@@ -245,7 +192,7 @@ namespace Messenger
         }
         private async Task<bool> CheckDeleteInvitation(string path, string data)
         {
-            return await fileMaster.ReadWrite(path, invitations =>
+            return await fileMaster.ReadWrite<string>(path, invitations =>
             {
                 if (invitations == null)
                 {
@@ -265,7 +212,7 @@ namespace Messenger
         }
         private async Task AddData(string path, string data)
         {
-            await fileMaster.ReadWrite(path, allData =>
+            await fileMaster.ReadWrite<string>(path, allData =>
             {
                 if (allData == null)
                 {
@@ -302,18 +249,6 @@ namespace Messenger
                         SendMessage("Bed input, write else");
                         break;
                 }
-                //if (message == "join")
-                //{
-                //    return await JoinToGroup(invitations);
-                //}
-                //else if (message == "look")
-                //{
-                //    SendGroups(invitations, "Invitation:");
-                //}
-                //else
-                //{
-                //    SendMessage("Bed input, write else");
-                //}
             }
         }
         private async Task<GroupInformation> JoinToGroup()
@@ -373,19 +308,11 @@ namespace Messenger
         }
         private async Task AddUserOrGroup(string path, string information)
         {
-            await fileMaster.ReadWrite(path, usersOrGroup =>
-            {
-                if (usersOrGroup == null)
-                {
-                    usersOrGroup = new List<string>();
-                }
-                usersOrGroup.Add(information);
-                return (usersOrGroup, true);
-            });
+            await fileMaster.ReadWrite(path, fileMaster.AddData(information));
         }
         private async Task DeleteInvitation(string path, string invitation)
         {
-            await fileMaster.ReadWrite(path, users =>
+            await fileMaster.ReadWrite<string>(path, users =>
             {
                 users.Remove(invitation);
                 return (users, true);
@@ -430,59 +357,6 @@ namespace Messenger
         {
             CreatorGroups creatorGroups = new CreatorGroups(user);
             return await creatorGroups.Run();
-            //if (result[0] != "")
-            //{
-            //    return OpenCreateChat(listener, nick, result);
-            //}
-            //return result;
-            Console.WriteLine("crasava");
-            Console.ReadKey();
-            //SendMessage("What type of group do you want?" +
-            //    "If secret, click 's', if public, click 'p'", listener);
-            //AnswerClient(listener);
-            //SendMessage("Enter a group name", listener);
-            //while (true)
-            //{
-            //    AnswerClient(listener);
-            //    if (data.ToString()[0] != '?')
-            //    {
-            //        SendMessage("Group name can`t start with '?', enter new", listener);
-            //        continue;
-            //    }
-            //    break;
-            //}
-            //SendMessage("Who do you want to invite to your group?\n\r" +
-            //    "If you want to check people, write ?/yes\n\r" +
-            //    "If you don`t want to add people, write ?/no\n\r", listener);
-            //bool canCreate = false;
-            //while (true)
-            //{
-            //    AnswerClient(listener);
-            //    if (data.ToString() == "?/yes")
-            //    {
-            //        var people = await FindChatsPeople(new List<string>(), "");
-            //        SendGroups(people, listener, "People");
-            //    }
-            //    else if (data.ToString() == "?/no")
-            //    {
-            //        if (canCreate)
-            //        {
-
-            //            SendMessage("You create group, thanks.\n\r" +
-            //                "If you want to open it, press enter, else - press else", listener);
-            //            break;
-            //        }
-            //        else
-            //        {
-            //            SendMessage("You can`t create group when you are alone in it, write other name group", listener);
-            //        }
-            //    }
-            //    else
-            //    {
-
-            //        canCreate = true;
-            //    }
-            //}
         }
         private void HelpFindChat(string message)
         {
@@ -495,36 +369,28 @@ namespace Messenger
                     userChats.UserGroups, userChats.PublicGroups, userChats.Invitations},
                     new string[] { "All people:", "Chats with people:", "Secret groups:", "User groups:", "Public groups:", "Invitations:" },
                     beginningName);
-                    //SendChatsWithHelper(0, beginningName, new string[] { "All people:", "Chat with people:", "Secret grout:", "User group:", "Public group:", "Invitation:" }, 6, allChats);
                     break;
                 case "pp":
                     SendChatsWithHelper(new List<List<string>> { userChats.AllElsePeople}, new string[] { "All people:" }, beginningName);
-                    //SendChatsWithHelper(1, beginningName, new string[] { "All people:" }, 1, allChats);
                     break;
                 case "ch":
                     SendChatsWithHelper(new List<List<string>> { userChats.ChatsWithPeople }, new string[] { "Chats with people:" }, beginningName);
-                    //SendChatsWithHelper(0, beginningName, new string[] { "Chat with people:" }, 1, allChats);
                     break;
                 case "gg":
                     SendChatsWithHelper(new List<List<string>> { userChats.SecretGroups, userChats.UserGroups, userChats.PublicGroups, userChats.Invitations},
                     new string[] { "Secret groups:", "User groups:", "Public groups:", "Invitations:" }, beginningName);
-                    //SendChatsWithHelper(0, beginningName, new string[] { "Secret grout:", "User group:", "Public group:", "Invitation:" }, 4, allChats);
                     break;
                 case "sg":
                     SendChatsWithHelper(new List<List<string>> { userChats.SecretGroups }, new string[] { "Secret groups:" }, beginningName);
-                    //SendChatsWithHelper(2, beginningName, new string[] { "Secret grout:" }, 1, allChats);
                     break;
                 case "ug":
                     SendChatsWithHelper(new List<List<string>> { userChats.UserGroups }, new string[] { "User groups:" }, beginningName);
-                    //SendChatsWithHelper(3, beginningName, new string[] { "User group:" }, 1, allChats);
                     break;
                 case "pg":
                     SendChatsWithHelper(new List<List<string>> { userChats.PublicGroups }, new string[] { "Public groups:" }, beginningName);
-                    //SendChatsWithHelper(4, beginningName, new string[] { "Public group:" }, 1, allChats);
                     break;
                 case "ii":
                     SendChatsWithHelper(new List<List<string>> { userChats.Invitations }, new string[] { "Invitations:" }, beginningName);
-                    //SendChatsWithHelper(5, beginningName, new string[] { "Invitation:" }, 1, allChats);
                     break;
             }
         }
@@ -537,42 +403,6 @@ namespace Messenger
                 i++;
             }
         }
-        //private void SendChatsWithHelper(int numList, string beginningName, string[] firstMassages, int countChats, List<string>[] allChats)
-        //{
-        //    var numArray = -1;
-        //    for (int i = allChats.Length - countChats; i < allChats.Length; i++)
-        //    {
-        //        numArray++;
-        //        List<string> needChats = new List<string>();
-        //        if (countChats > 1)
-        //        {
-        //            numList = i;
-        //        }
-        //        if (allChats[numList] != null)
-        //        {
-        //            foreach (var chat in allChats[numList])
-        //            {
-        //                if (chat.Length >= beginningName.Length)
-        //                {
-        //                    var needAdd = true;
-        //                    for (int j = 0; j < beginningName.Length; j++)
-        //                    {
-        //                        if (chat[j] != beginningName[j])
-        //                        {
-        //                            needAdd = false;
-        //                            break;
-        //                        }
-        //                    }
-        //                    if (needAdd)
-        //                    {
-        //                        needChats.Add(chat);
-        //                    }
-        //                }
-        //            }
-        //        }
-        //        SendGroups(needChats, firstMassages[numArray]);
-        //    }
-        //}
         private void SendChats(bool onlyGroup)
         {
             if (!onlyGroup)
@@ -584,39 +414,7 @@ namespace Messenger
             SendGroups(userChats.UserGroups, "User groups:");
             SendGroups(userChats.PublicGroups, "Public groups:");
             SendGroups(userChats.Invitations, "Invitations:");
-            //if (enteringChats[0].Count == 0)
-            //{
-            //    SendMessage("Chatting with people:\n\t(don`t have)", listener);
-            //}
-            //else
-            //{
-            //    SendMessage("Chatting with people:", listener);
-            //    AnswerClient(listener);
-
-            //}
-            ////else
-            ////{
-            ////    SendMessage("SendChats", listener);
-            ////    AnswerClient(listener);
-            ////    ///////////////////////////////////////////////////////////sendinggoups
-            ////}
-            //SendPublicGroups(listener);
-
-
         }
-        //private void SendSomeGroups(Socket listener, string[] group)
-        //{
-
-        //}
-        //private void SendPublicGroups(Socket listener)
-        //{
-        //    var publicGroups = Directory.GetDirectories(PublicGroupsPath);
-        //    SendMessage("Public chat", listener);
-        //    AnswerClient(listener);
-        //    SendMessage($"{publicGroups.Length}", listener);
-        //    AnswerClient(listener);
-        //    SendGroups(publicGroups, listener);
-        //}
         private void SendGroups(IEnumerable<string> groups, string firstMassage)
         {
             SendMessage(firstMassage);
@@ -634,112 +432,6 @@ namespace Messenger
                 SendMessage(group);
                 AnswerClient();
             }
-        }
-        //private async Task<List<string>[]> FindAllChats()
-        //{
-        //    return await ReadFiles();
-        //    //var peopleChatsJson = await FindChatsPeople(enteringChats[0]);//////can be misstake
-        //    //Array.Copy(enteringChats, 0, enteringChats = new List<string>[enteringChats.Length + 1], 1, enteringChats.Length - 1);
-        //    //enteringChats[0] = enteringChats[1];
-        //    //enteringChats[1] = peopleChatsJson;
-        //    //return enteringChats;
-        //}
-        private async Task<List<string>[]> ReadFiles()
-        {
-
-            var peopleChatsBeenJson = await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json");
-            var peopleChatsBeen = FindPeopleInChatsBeen(peopleChatsBeenJson);
-            //var peopleChatsBeen = (await fileMaster.ReadAndDesToPersonCh($@"{UserFoldersPath}\{user.Nickname}\peopleChatsBeen.json"))
-            //    .Select(chat => chat.Nicknames[0] != user.Nickname ? chat.Nicknames[0] : chat.Nicknames[1])
-            //    .DefaultIfEmpty()
-            //    .ToList();
-            var peopleChatsJson = await FindChatsPeople(peopleChatsBeen);//////can be misstake
-            var peopleChatsJsonn = (await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
-                .Select(x => x.Nickname)
-                .Where(x => x != user.Nickname)
-                .Except(peopleChatsBeen)
-                .DefaultIfEmpty()
-                .ToList();
-            var secretGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\secretGroups.json");
-            var userGroupsJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\userGroups.json");
-            var publicGroups = FindPublicGroup();
-            //var publicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup")
-            //    .Select(path => fileMaster.GetFileName(path))
-            //    .DefaultIfEmpty()
-            //    .ToList();
-            var invitationJson = await fileMaster.ReadAndDesToLString($@"{UserFoldersPath}\{user.Nickname}\invitation.json");
-            return new List<string>[] { peopleChatsBeen, peopleChatsJson, secretGroupsJson, userGroupsJson, publicGroups, invitationJson };
-        }
-        private List<string> FindPeopleInChatsBeen(List<PersonChat> peopleChatsBeenJson)
-        {
-            if (peopleChatsBeenJson == null || peopleChatsBeenJson.Count == 0)
-            {
-                return new List<string>();
-            }
-            var peopleChatsBeen = new List<string>();
-            foreach (var peopleChatBeenJson in peopleChatsBeenJson)
-            {
-                if (peopleChatBeenJson.Nicknames[0] != user.Nickname)
-                {
-                    peopleChatsBeen.Add(peopleChatBeenJson.Nicknames[0]);
-                }
-                else
-                {
-                    peopleChatsBeen.Add(peopleChatBeenJson.Nicknames[1]);
-                }
-            }
-            return peopleChatsBeen;
-        }
-        private List<string> FindPublicGroup()
-        {
-            var publicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup");
-            var publicGroupList = new List<string>();
-            foreach (var publicGroup in publicGroups)
-            {
-                publicGroupList.Add(fileMaster.GetFileName(publicGroup));
-            }
-            return publicGroupList;
-        }
-        private async Task<List<string>> FindChatsPeople(List<string> peopleChatsBeenJson)
-        {
-            var allPeopleJson = await fileMaster.ReadAndDesToLUserInf($@"D:\temp\messenger\nicknamesAndPasswords\users.json");
-            //var allPeopleWithoutPasswordJson = allPeopleJson.Select(x => x.Nickname).Where(x => x != userNick);
-            var allPeopleWithoutPasswordJsons = new List<string>();
-            if (allPeopleJson != null)
-            {
-                foreach (var personJson in allPeopleJson)
-                {
-                    var needAdd = true;
-                    if (peopleChatsBeenJson != null)
-                    {
-                        foreach (var personChatBeenJson in peopleChatsBeenJson)
-                        {
-                            if (personJson.Nickname == personChatBeenJson)
-                            {
-                                needAdd = false;
-                                continue; //break?
-                            }
-                        }
-                    }
-                    if (needAdd)
-                    {
-                        if (personJson.Nickname != user.Nickname)
-                        {
-                            allPeopleWithoutPasswordJsons.Add(personJson.Nickname);
-                        }
-                    }
-                }
-            }
-            return allPeopleWithoutPasswordJsons;
-            //if (allPeopleWithoutPasswordJson.Count() != 0)
-            //{
-            //    if (peopleChatsBeenJson != null)
-            //    {
-            //        return allPeopleWithoutPasswordJson.Except(peopleChatsBeenJson);
-            //    }
-            //    return allPeopleWithoutPasswordJson;
-            //}
-            //return peopleChatsBeenJson;
         }
         private void SendMessage(string message)
         {

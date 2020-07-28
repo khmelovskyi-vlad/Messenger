@@ -33,36 +33,13 @@ namespace Messenger
         {
             return Path.GetFileName(path);
         }
-        public async Task<List<UserNicknameAndPasswordAndIPs>> ReadAndDesToLUserInf(string path)
-        {
-            var dataJson = await ReadData(path);
-            return DesToLUserInf(dataJson);
-        }
-        public async Task<List<string>> ReadAndDesToLString(string path)
-        {
-            var dataJson = await ReadData(path);
-            return DesToLString(dataJson);
-        }
-        public async Task<List<PersonChat>> ReadAndDesToPersonCh(string path)
-        {
-            var dataJson = await ReadData(path);
-            return DesToPersonCh(dataJson);
-        }
-        private List<PersonChat> DesToPersonCh(string dataJson)
-        {
-            return JsonConvert.DeserializeObject<List<PersonChat>>(dataJson);
-        }
-        private List<UserNicknameAndPasswordAndIPs> DesToLUserInf(string dataJson)
-        {
-            return JsonConvert.DeserializeObject<List<UserNicknameAndPasswordAndIPs>>(dataJson);
-        }
-        private List<string> DesToLString(string dataJson)
-        {
-            return JsonConvert.DeserializeObject<List<string>>(dataJson);
-        }
         public string[] ReadUsersPaths()
         {
             return Directory.GetFiles(@"D:\temp\messenger\Users");
+        }
+        public async Task<List<T>> ReadAndDeserialize<T>(string path)
+        {
+            return JsonConvert.DeserializeObject<List<T>>(await ReadData(path));
         }
         public async Task<string> ReadData(string path)
         {
@@ -167,9 +144,6 @@ namespace Messenger
                             {
                                 await WriteData(path, needData, stream);
                             }
-                            //var buffer = Encoding.Default.GetBytes("test");
-                            //stream.Write(buffer, 0, buffer.Length);
-                            //result = true;
                             return needWrite;
                         }
                     }
@@ -245,29 +219,59 @@ namespace Messenger
                 }
             }
         }
-        public async Task<bool> ReadWrite(string path, Func<List<string>, (List<string>, bool)> func)
+        //public async Task<bool> ReadWrite(string path, Func<List<string>, (List<string>, bool)> func)
+        //{
+        //    var readerWriterStr = ReaderWriter<string>.Initialize();
+        //    Console.WriteLine(readerWriterStr.GetHashCode());
+        //    return await readerWriterStr.ReadWrite(path, func);
+        //}
+        //public async Task<bool> ReadWrite(string path, Func<List<UserNicknameAndPasswordAndIPs>, (List<UserNicknameAndPasswordAndIPs>, bool)> func)
+        //{
+        //    var readerWriterUserNPI = ReaderWriter<UserNicknameAndPasswordAndIPs>.Initialize();
+        //    Console.WriteLine(readerWriterUserNPI.GetHashCode());
+        //    return await readerWriterUserNPI.ReadWrite(path, func);
+        //}
+        //public async Task<bool> ReadWrite(string path, Func<List<PersonChat>, (List<PersonChat>, bool)> func)
+        //{
+        //    var readerPersonChat = ReaderWriter<PersonChat>.Initialize();
+        //    Console.WriteLine(readerPersonChat.GetHashCode());
+        //    return await readerPersonChat.ReadWrite(path, func);
+        //}
+        //public async Task<bool> ReadWrite(string path, Func<List<int>, (List<int>, bool)> func)
+        //{
+        //    var readerPersonChat = ReaderWriter<int>.Initialize();
+        //    Console.WriteLine(readerPersonChat.GetHashCode());
+        //    return await readerPersonChat.ReadWrite(path, func);
+        //}
+        public async Task<bool> ReadWrite<T>(string path, Func<List<T>, (List<T>, bool)> func)
         {
-            var readerWriterStr = ReaderWriter<string>.Initialize();
-            Console.WriteLine(readerWriterStr.GetHashCode());
-            return await readerWriterStr.ReadWrite(path, func);
-        }
-        public async Task<bool> ReadWrite(string path, Func<List<UserNicknameAndPasswordAndIPs>, (List<UserNicknameAndPasswordAndIPs>, bool)> func)
-        {
-            var readerWriterUserNPI = ReaderWriter<UserNicknameAndPasswordAndIPs>.Initialize();
-            Console.WriteLine(readerWriterUserNPI.GetHashCode());
-            return await readerWriterUserNPI.ReadWrite(path, func);
-        }
-        public async Task<bool> ReadWrite(string path, Func<List<PersonChat>, (List<PersonChat>, bool)> func)
-        {
-            var readerPersonChat = ReaderWriter<PersonChat>.Initialize();
+            var readerPersonChat = ReaderWriter<T>.Initialize();
             Console.WriteLine(readerPersonChat.GetHashCode());
             return await readerPersonChat.ReadWrite(path, func);
         }
-        public async Task<bool> ReadWrite(string path, Func<List<int>, (List<int>, bool)> func)
+        public Func<List<T>, (List<T>, bool)> AddData<T>(T data)
         {
-            var readerPersonChat = ReaderWriter<int>.Initialize();
-            Console.WriteLine(readerPersonChat.GetHashCode());
-            return await readerPersonChat.ReadWrite(path, func);
+            return (datas =>
+            {
+                if (datas == null)
+                {
+                    datas = new List<T>();
+                }
+                datas.Add(data);
+                return (datas, true);
+            });
+        }
+        public Func<List<T>, (List<T>, bool)> AddSomeData<T>(List<T> someData)
+        {
+            return (datas =>
+            {
+                if (datas == null)
+                {
+                    datas = new List<T>();
+                }
+                datas.AddRange(someData);
+                return (datas, true);
+            });
         }
         private void SetLastWriteTime(string path)
         {

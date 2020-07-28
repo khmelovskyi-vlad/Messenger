@@ -18,9 +18,6 @@ namespace Messenger
         }
         public List<User> online = new List<User>();
         public object locketOnline = new object();
-        private List<string> users;
-        private StringBuilder data;
-        private byte[] buffer;
         const int size = 256;
         private object obj = new object();
         private string UserFoldersPath { get { return @"D:\temp\messenger\Users"; } }

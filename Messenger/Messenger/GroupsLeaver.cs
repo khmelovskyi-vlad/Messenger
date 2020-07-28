@@ -31,7 +31,6 @@ namespace Messenger
             {
                 await AddData(pathElements);
             }
-            //communication.SendMessage("You leave a chat");
             return true;
         }
         private string[] FindPathsElement()
@@ -53,7 +52,7 @@ namespace Messenger
         private async Task<bool> DeleteData(string[] pathsElement)
         {
             var needDeleteGroup = false;
-            await fileMaster.ReadWrite($"{pathChat}\\users.json", users =>
+            await fileMaster.ReadWrite<string>($"{pathChat}\\users.json", users =>
             {
                 users.Remove(userNick);
                 if (users.Count == 0)
@@ -74,7 +73,7 @@ namespace Messenger
             }
             else
             {
-                await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement[0]}.json", nameChats =>
+                await fileMaster.ReadWrite<string>($@"D:\temp\messenger\Users\{userNick}\{pathsElement[0]}.json", nameChats =>
                 {
                     return ((nameChats ?? new List<string>())
                     .Where(chat => chat != NameChat)
@@ -85,7 +84,7 @@ namespace Messenger
         }
         private async Task DeletePeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
+            await fileMaster.ReadWrite<PersonChat>($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
             {
                 if (nameChats != null)
                 {
@@ -108,43 +107,19 @@ namespace Messenger
         }
         private async Task AddData(string[] pathsElement)
         {
-            await fileMaster.ReadWrite($"{pathChat}\\leavedPeople.json", users =>
-            {
-                if (users == null)
-                {
-                    users = new List<string>();
-                }
-                users.Add(userNick);
-                return (users, true);
-            });
+            await fileMaster.ReadWrite($"{pathChat}\\leavedPeople.json", fileMaster.AddData(userNick));
             if (pathsElement[0] == "peopleChatsBeen")
             {
                 await AddPeopleChatsBeen("leavedPeopleChatsBeen");
             }
             else
             {
-                await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement[1]}.json", nameChats =>
-                {
-                    if (nameChats == null)
-                    {
-                        nameChats = new List<string>();
-                    }
-                    nameChats.Add(NameChat);
-                    return (nameChats, true);
-                });
+                await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement[1]}.json", fileMaster.AddData(NameChat));
             }
         }
         private async Task AddPeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
-            {
-                if (nameChats == null)
-                {
-                    nameChats = new List<PersonChat>();
-                }
-                nameChats.Add(needChat);
-                return (nameChats, true);
-            });
+            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", fileMaster.AddData(needChat));
         }
         private async Task DeleteGroup()
         {

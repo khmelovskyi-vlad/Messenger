@@ -32,7 +32,7 @@ namespace Messenger
         }
         private async Task ReadWritePort()
         {
-            await fileMaster.ReadWrite(@"D:\temp\messenger\ports.json", ports =>
+            await fileMaster.ReadWrite<int>(@"D:\temp\messenger\ports.json", ports =>
             {
                 if (ports == null)
                 {
@@ -113,29 +113,5 @@ namespace Messenger
             fileMaster.CreateDirectory(@"D:\temp\messenger\secretGroup");
             fileMaster.CreateDirectory(@"D:\temp\messenger\Users");
         }
-        //private void Test(Socket socket)
-        //{
-        //    var path = @"D:\temp\k.mp4";
-        //    //var path = @"D:\temp\ok2";
-        //    var s = File.Exists(path);
-        //    Console.WriteLine(s);
-        //    if (s)
-        //    {
-        //        socket.SendFile(path);
-        //        Console.ReadKey();
-        //    }
-        //    Console.ReadKey();
-        //}
-        //private void Test(Socket listener)
-        //{
-        //    var s = "IMG_20191203_201515.jpg";
-        //    //var firstMessage = Encoding.ASCII.GetBytes(@"D:\temp\ok\IMG_20191203_201515.jpg");
-        //    //var lastMessage = Encoding.ASCII.GetBytes("Thanks");
-        //    //listener.SendFile(@"D:\temp\ok2\IMG_20191203_201515.jpg", firstMessage, lastMessage, TransmitFileOptions.ReuseSocket);
-        //    listener.Send(Encoding.ASCII.GetBytes("IMG_20191203_201515.jpg"));
-        //    var buffer = new byte[256];
-        //    listener.Receive(buffer);
-        //    listener.SendFile($@"D:\temp\ok2\{s}");
-        //}
     }
 }

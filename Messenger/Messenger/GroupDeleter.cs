@@ -64,7 +64,7 @@ namespace Messenger
         {
             foreach (var path in paths)
             {
-                await fileMaster.ReadWrite(path, nameChats =>
+                await fileMaster.ReadWrite<PersonChat>(path, nameChats =>
                 {
                     return ((nameChats ?? new List<PersonChat>())
                     .Where(chat => chat.NameChat != NameChat)
@@ -76,7 +76,7 @@ namespace Messenger
         {
             foreach (var path in paths)
             {
-                await fileMaster.ReadWrite(path, users =>
+                await fileMaster.ReadWrite<string>(path, users =>
                 {
                     users.Remove(nameChat);
                     return (users, true);
@@ -85,7 +85,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindUserPath(string path, string lastPartOfPath)
         {
-            return ((await fileMaster.ReadAndDesToLString(path))
+            return ((await fileMaster.ReadAndDeserialize<string>(path))
                 ?? new List<string>())
                 .Select(user => $@"D:\temp\messenger\Users\{user}{lastPartOfPath}")
                 .ToList();
