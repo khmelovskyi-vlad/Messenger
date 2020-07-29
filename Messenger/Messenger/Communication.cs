@@ -49,6 +49,35 @@ namespace Messenger
             } while (listener.Available > 0);
             CheckEndTask(listener);
         }
+        //public void AnswerClientt()
+        //{
+        //    buffer = new byte[size];
+        //    data = new StringBuilder();
+        //    listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallbackk, listener);
+        //    CheckEndTask(listener);
+        //}
+        //public string TakeMessage()
+        //{
+        //    resetReceive.WaitOne();
+        //    return data.ToString();
+        //}
+        //private void ReceiveCallbackk(IAsyncResult AR)
+        //{
+        //    Socket current = (Socket)AR.AsyncState;
+        //    var received = current.EndReceive(AR);
+        //    if (received > 0)
+        //    {
+        //        data.Append(Encoding.ASCII.GetString(buffer, 0, received));
+        //    }
+        //    if (current.Available > 0)
+        //    {
+        //        current.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallbackk, current);
+        //    }
+        //    else
+        //    {
+        //        resetReceive.Set();
+        //    }
+        //}
         private void ReceiveCallback(IAsyncResult AR)
         {
             Socket current = (Socket)AR.AsyncState;
@@ -81,7 +110,7 @@ namespace Messenger
         {
             byte[] byteData = Encoding.ASCII.GetBytes(message);
             listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-            resetSend.WaitOne();
+            //resetSend.WaitOne();
         }
         public void SendMessage(string message)
         {
@@ -131,14 +160,12 @@ namespace Messenger
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
-                var endSend = 0;
                 do
                 {
                     listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallback, listener);
                     resetReceive.WaitOne();
                     await stream.WriteAsync(buffer, 0, countReceivedBytes);
-                    endSend = endSend + countReceivedBytes;
-                } while (endSend != fileLength);
+                } while (stream.Length != fileLength);
             }
         }
         public async Task ReceiveFile2(string path)
@@ -182,13 +209,48 @@ namespace Messenger
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
-                var endSend = 0;
                 do
                 {
                     bufferSize = listener.Receive(buffer);
-                    endSend = endSend + bufferSize;
                     stream.Write(buffer, 0, bufferSize);
-                } while (endSend != fileLength);
+                } while (stream.Length != fileLength);
+            }
+        }
+        public void ReceiveFile4(string path)
+        {
+            buffer = new byte[8];
+            var bufferSize = listener.Receive(buffer);
+            var fileLength = BitConverter.ToInt64(buffer, 0);
+            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
+            {
+                StateObject stateObject = new StateObject { socket = listener, stream = stream, fileLength = fileLength };
+                listener.BeginReceive(stateObject.buffer, 0, StateObject.bufSize, SocketFlags.None, ReceiveFileCallbackk, stateObject);
+                resetReceive.WaitOne();
+            }
+        }
+        public class StateObject
+        {
+            public long fileLength;
+            public Socket socket = null;
+            public const int bufSize = 1024;
+            public byte[] buffer = new byte[bufSize];
+            public FileStream stream;
+        }
+        private void ReceiveFileCallbackk(IAsyncResult AR)
+        {
+            var stateObject = (StateObject)AR.AsyncState;
+            var received = stateObject.socket.EndReceive(AR);
+            if (received > 0)
+            {
+                stateObject.stream.Write(stateObject.buffer, 0, received);
+            }
+            if (stateObject.fileLength != stateObject.stream.Length)
+            {
+                stateObject.socket.BeginReceive(stateObject.buffer, 0, StateObject.bufSize, SocketFlags.None, ReceiveFileCallbackk, stateObject);
+            }
+            else
+            {
+                resetReceive.Set();
             }
         }
     }

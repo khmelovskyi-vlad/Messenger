@@ -2,6 +2,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -433,7 +434,11 @@ namespace Messenger
                 normalTime.Append(timeChar);
             }
             var filePath = $@"{PathChat}\\{normalTime}{nameFile}";
-            user.communication.ReceiveFile3(filePath);
+            var sw = new Stopwatch();
+            sw.Start();
+            user.communication.ReceiveFile4(filePath);
+            sw.Stop();
+            Console.WriteLine(sw.Elapsed);
             SendMessageAndAddUser("The file has been sent", user);
             await SendMessageAllUsers(user.Nickname, nameFile);
         }

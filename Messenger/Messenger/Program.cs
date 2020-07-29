@@ -8,6 +8,8 @@ using Newtonsoft.Json;
 using System.IO;
 using System.Threading;
 using System.IO.Pipes;
+using System.Net.Sockets;
+using System.Net;
 
 namespace Messenger
 {
