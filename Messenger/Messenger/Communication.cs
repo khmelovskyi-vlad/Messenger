@@ -19,24 +19,13 @@ namespace Messenger
         public StringBuilder data;
         public bool EndTask = false;
         private byte[] buffer;
-        const int size = 256;
-        AutoResetEvent resetSend = new AutoResetEvent(false);
+        const int size = 1024;
+        AutoResetEvent resetSend = new AutoResetEvent(true);
         AutoResetEvent resetReceive = new AutoResetEvent(false);
         public void SendMessageAndAnswerClient(string message)
         {
             SendMessage(message);
             AnswerClient();
-        }
-        public void AnswerClient(Socket listener)
-        {
-            buffer = new byte[size];
-            data = new StringBuilder();
-            do
-            {
-                listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
-                resetReceive.WaitOne();
-            } while (listener.Available > 0);
-            CheckEndTask(listener);
         }
         public void AnswerClient()
         {
@@ -100,23 +89,17 @@ namespace Messenger
         {
             if (EndTask == true)
             {
+                resetSend.WaitOne();
                 byte[] byteData = Encoding.ASCII.GetBytes("?/you left the chat");
                 listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-                resetSend.WaitOne();
                 throw new OperationCanceledException();
             }
         }
-        public void SendMessage(string message, Socket listener)
-        {
-            byte[] byteData = Encoding.ASCII.GetBytes(message);
-            listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-            //resetSend.WaitOne();
-        }
         public void SendMessage(string message)
         {
+            resetSend.WaitOne();
             byte[] byteData = Encoding.ASCII.GetBytes(message);
             listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-            resetSend.WaitOne();
         }
         private void SendCallback(IAsyncResult AR)
         {
@@ -223,8 +206,9 @@ namespace Messenger
             var fileLength = BitConverter.ToInt64(buffer, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
+                buffer = new byte[size];
                 StateObject stateObject = new StateObject { socket = listener, stream = stream, fileLength = fileLength };
-                listener.BeginReceive(stateObject.buffer, 0, StateObject.bufSize, SocketFlags.None, ReceiveFileCallbackk, stateObject);
+                listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
                 resetReceive.WaitOne();
             }
         }
@@ -232,8 +216,6 @@ namespace Messenger
         {
             public long fileLength;
             public Socket socket = null;
-            public const int bufSize = 1024;
-            public byte[] buffer = new byte[bufSize];
             public FileStream stream;
         }
         private void ReceiveFileCallbackk(IAsyncResult AR)
@@ -242,11 +224,11 @@ namespace Messenger
             var received = stateObject.socket.EndReceive(AR);
             if (received > 0)
             {
-                stateObject.stream.Write(stateObject.buffer, 0, received);
+                stateObject.stream.Write(buffer, 0, received);
             }
             if (stateObject.fileLength != stateObject.stream.Length)
             {
-                stateObject.socket.BeginReceive(stateObject.buffer, 0, StateObject.bufSize, SocketFlags.None, ReceiveFileCallbackk, stateObject);
+                stateObject.socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
             }
             else
             {

@@ -34,6 +34,7 @@ namespace Messenger
         {
             //Interlocked.Add()
             CreateMainMessage();
+            user.communication.AnswerClient();
             user.communication.SendMessageAndAnswerClient(TypeChat);
             user.communication.SendMessageAndAnswerClient(message);
             if (firstConnect)
@@ -42,6 +43,19 @@ namespace Messenger
             }
             SendManyMessages(messages, user, messagesLock);
             UsersOnline.Add(user);
+            try
+            {
+                await Communicate(user);
+            }
+            catch (Exception ex)
+            {
+                UsersOnline.Remove(user);
+                UsersOnlineToCheck.Remove(user);
+                throw ex;
+            }
+        }
+        private async Task Communicate(User user)
+        {
             while (true)
             {
                 user.communication.AnswerClient();
@@ -116,6 +130,23 @@ namespace Messenger
             SendManyMessages(user.UnReadMessages, user, user.MessagesLock);
             UsersOnline.Add(user);
             UsersOnlineToCheck.Remove(user);
+        }
+        private void KickPeople(User user)
+        {
+            foreach (var userOnline in UsersOnline)
+            {
+                if (user.Nickname != userOnline.Nickname)
+                {
+                    userOnline.communication.EndTask = true;
+                }
+            }
+            foreach (var userOnlineToCheck in UsersOnlineToCheck)
+            {
+                if (user.Nickname != userOnlineToCheck.Nickname)
+                {
+                    userOnlineToCheck.communication.EndTask = true;
+                }
+            }
         }
         private void CreateMainMessage()
         {
@@ -264,6 +295,7 @@ namespace Messenger
                 var nameNewGroup = user.communication.data.ToString();
                 if (CheckGroups(nameNewGroup, pathNewGroup, user))
                 {
+                    KickPeople(user);
                     var groupUser = await FindAnotherUser(user);
                     var userPath = $@"D:\temp\messenger\Users\{groupUser}";
                     var usersPaths = new string[] { $@"D:\temp\messenger\Users\{user.Nickname}", userPath };
@@ -436,7 +468,7 @@ namespace Messenger
             var filePath = $@"{PathChat}\\{normalTime}{nameFile}";
             var sw = new Stopwatch();
             sw.Start();
-            user.communication.ReceiveFile4(filePath);
+            user.communication.ReceiveFile3(filePath);
             sw.Stop();
             Console.WriteLine(sw.Elapsed);
             SendMessageAndAddUser("The file has been sent", user);
@@ -494,7 +526,7 @@ namespace Messenger
             var messageSend = $"{userNickname}: {message}\n\r{DateTime.Now.ToString()}";
             foreach (var userOnline in UsersOnline)
             {
-                userOnline.communication.SendMessage(messageSend, userOnline.Socket);
+                userOnline.communication.SendMessage(messageSend);
             }
             foreach (var userOnlineToCheck in UsersOnlineToCheck)
             {

@@ -121,7 +121,7 @@ namespace Messenger
             }
             return new GroupInformation { CanOpenChat = false};
         }
-        private async Task<GroupInformation> CreateChat(string namePerson, List<string> people, string typeGroup)
+        private async Task<GroupInformation> CreateChat(string namePerson, string typeGroup)
         {
             var nameChat = $"{namePerson} {user.Nickname}";
             PersonChat personChat = new PersonChat(new string[] { namePerson, user.Nickname }, nameChat);
@@ -147,22 +147,22 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pp":
-                    groups = userChats.AllElsePeople;
+                    groups = await userChats.FindAllElsePeople();
                     needCreatePP = true;
                     break;
                 case "ch":
-                    groups = userChats.ChatsWithPeople;
+                    groups = await userChats.FindChatsWithPeople();
                     needCorect = true;
                     break;
                 case "sg":
-                    groups = userChats.SecretGroups;
+                    groups = await userChats.FindSecretGroups();
                     pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
                     break;
                 case "ug":
-                    groups = userChats.UserGroups;
+                    groups = await userChats.FindUserGroups();
                     break;
                 case "pg":
-                    groups = userChats.PublicGroups;
+                    groups = userChats.FindPublicGroups();
                     needAddUser = true;
                     break;
             }
@@ -174,7 +174,7 @@ namespace Messenger
                     {
                         if (needCreatePP)
                         {
-                            return await CreateChat(nameGroup, groups, typeGroup);
+                            return await CreateChat(nameGroup, typeGroup);
                         }
                         else if (needCorect)
                         {

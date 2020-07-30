@@ -35,27 +35,54 @@ namespace Messenger
         {
             return (await fileMaster.ReadAndDeserialize<PersonChat>($@"{userFoldersPath}\{nick}\peopleChatsBeen.json")) ?? new List<PersonChat>();
         }
-        public async Task FindInvitations()
+        public async Task<List<string>> FindInvitations()
         {
             Invitations = await fileMaster.ReadAndDeserialize<string>($@"{userFoldersPath}\{nick}\invitation.json");
+            return Invitations;
         }
-        public async Task FindAllChats()
+        public async Task<List<string>> FindUserGroups()
         {
-            ChatsWithPeople = ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{userFoldersPath}\{nick}\peopleChatsBeen.json"))
-                ?? new List<PersonChat>())
-                .Select(chat => chat.Nicknames[0] != nick ? chat.Nicknames[0] : chat.Nicknames[1])
-                .ToList();
+            UserGroups = await fileMaster.ReadAndDeserialize<string>($@"{userFoldersPath}\{nick}\userGroups.json");
+            return UserGroups;
+        }
+        public async Task<List<string>> FindAllElsePeople()
+        {
+            await FindChatsWithPeople();
             AllElsePeople = ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(x => x.Nickname)
                 .Where(x => x != nick)
                 .Except(ChatsWithPeople)
                 .ToList();
+            return AllElsePeople;
+        }
+        public async Task<List<string>> FindChatsWithPeople()
+        {
+            ChatsWithPeople = ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{userFoldersPath}\{nick}\peopleChatsBeen.json"))
+                ?? new List<PersonChat>())
+                .Select(chat => chat.Nicknames[0] != nick ? chat.Nicknames[0] : chat.Nicknames[1])
+                .ToList();
+            return ChatsWithPeople;
+        }
+        public async Task<List<string>> FindSecretGroups()
+        {
             SecretGroups = await fileMaster.ReadAndDeserialize<string>($@"{userFoldersPath}\{nick}\secretGroups.json");
-            UserGroups = await fileMaster.ReadAndDeserialize<string>($@"{userFoldersPath}\{nick}\userGroups.json");
+            return SecretGroups;
+        }
+        public List<string> FindPublicGroups()
+        {
             PublicGroups = fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup")
                 .Select(path => fileMaster.GetFileName(path))
                 .ToList();
+            return PublicGroups;
+        }
+        public async Task FindAllChats()
+        {
+            //await FindChatsWithPeople();
+            await FindAllElsePeople();
+            await FindSecretGroups();
+            await FindUserGroups();
+            FindPublicGroups();
             await FindInvitations();
         }
     }

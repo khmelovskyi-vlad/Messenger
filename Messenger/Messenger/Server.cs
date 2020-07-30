@@ -100,7 +100,7 @@ namespace Messenger
                 }
                 catch (Exception socketException)
                 {
-                    throw socketException;
+                    //throw socketException;
                 }
             }, tcpSocket));
         }

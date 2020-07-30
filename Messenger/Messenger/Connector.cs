@@ -252,9 +252,15 @@ namespace Messenger
                                 {
                                     return communication.data.ToString();
                                 }
-                                communication.SendMessage($"This nickname is online, write else {lastString}");
+                                else
+                                {
+                                    communication.SendMessage($"This nickname is online, write else {lastString}");
+                                }
                             }
-                            communication.SendMessage($"This nickname is in ban, write else {lastString}");
+                            else
+                            {
+                                communication.SendMessage($"This nickname is in ban, write else {lastString}");
+                            }
                         }
                     }
                     communication.AnswerClient();

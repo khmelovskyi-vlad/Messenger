@@ -43,6 +43,19 @@ namespace Messenger
                 {
                     online.Add(user);
                 }
+                await FindUseChat(user);
+                lock (locketOnline)
+                {
+                    online.Remove(user);
+                }
+                return true;
+            }
+            return false;
+        }
+        private async Task FindUseChat(User user)
+        {
+            try
+            {
                 while (true)
                 {
                     GroupMaster groupMaster = new GroupMaster(user);
@@ -60,13 +73,15 @@ namespace Messenger
                         break;
                     }
                 }
+            }
+            catch (Exception ex)
+            {
                 lock (locketOnline)
                 {
                     online.Remove(user);
                 }
-                return true;
+                throw ex;
             }
-            return false;
         }
         private bool CheckLeftMessanger(User user)
         {
