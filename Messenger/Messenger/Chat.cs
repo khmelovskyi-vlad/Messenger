@@ -21,7 +21,9 @@ namespace Messenger
             this.PathChat = pathChat;
         }
         public string NameChat { get; set; }
+        private object usersOnlineLock = new object();
         public List<User> UsersOnline = new List<User>();
+        private object usersOnlineToCheckLock = new object();
         public List<User> UsersOnlineToCheck = new List<User>();
         private string TypeChat { get; set; }
         private List<string> messages;
@@ -42,15 +44,24 @@ namespace Messenger
                 await FirstRead();
             }
             SendManyMessages(messages, user, messagesLock);
-            UsersOnline.Add(user);
+            lock (usersOnlineLock)
+            {
+                UsersOnline.Add(user);
+            }
             try
             {
                 await Communicate(user);
             }
             catch (Exception ex)
             {
-                UsersOnline.Remove(user);
-                UsersOnlineToCheck.Remove(user);
+                lock (usersOnlineLock)
+                {
+                    UsersOnline.Remove(user);
+                }
+                lock (usersOnlineToCheckLock)
+                {
+                    UsersOnlineToCheck.Remove(user);
+                }
                 throw ex;
             }
         }
@@ -92,7 +103,10 @@ namespace Messenger
                         }
                         continue;
                     case "?/end":
-                        UsersOnline.Remove(user);
+                        lock (usersOnlineLock)
+                        {
+                            UsersOnline.Remove(user);
+                        }
                         user.communication.SendMessage("?/you left the chat");
                         return;
                     default:
@@ -109,7 +123,10 @@ namespace Messenger
             {
                 GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, PathChat, TypeChat, NameChat, fileMaster);
                 await groupsLeaver.Leave();
-                UsersOnlineToCheck.Remove(user);
+                lock (usersOnlineToCheckLock)
+                {
+                    UsersOnlineToCheck.Remove(user);
+                }
                 user.communication.SendMessage("?/you left the chat");
                 return true;
             }
@@ -121,31 +138,51 @@ namespace Messenger
         }
         private void RemoveUser(User user)
         {
-            UsersOnline.Remove(user);
-            UsersOnlineToCheck.Add(user);
+            lock (usersOnlineLock)
+            {
+                UsersOnline.Remove(user);
+            }
+            lock (usersOnlineToCheckLock)
+            {
+                UsersOnlineToCheck.Add(user);
+            }
         }
         private void AddUser(User user)
         {
             user.communication.AnswerClient();
             SendManyMessages(user.UnReadMessages, user, user.MessagesLock);
-            UsersOnline.Add(user);
-            UsersOnlineToCheck.Remove(user);
+            lock (usersOnlineLock)
+            {
+                UsersOnline.Add(user);
+            }
+            lock (usersOnlineToCheckLock)
+            {
+                UsersOnlineToCheck.Remove(user);
+            }
         }
         private void KickPeople(User user)
         {
-            foreach (var userOnline in UsersOnline)
+            lock (usersOnlineLock)
             {
-                if (user.Nickname != userOnline.Nickname)
+                foreach (var userOnline in UsersOnline)
                 {
-                    userOnline.communication.EndTask = true;
+                    if (user.Nickname != userOnline.Nickname)
+                    {
+                        userOnline.communication.EndTask = true;
+                    }
                 }
+                UsersOnline = new List<User>();
             }
-            foreach (var userOnlineToCheck in UsersOnlineToCheck)
+            lock (usersOnlineToCheckLock)
             {
-                if (user.Nickname != userOnlineToCheck.Nickname)
+                foreach (var userOnlineToCheck in UsersOnlineToCheck)
                 {
-                    userOnlineToCheck.communication.EndTask = true;
+                    if (user.Nickname != userOnlineToCheck.Nickname)
+                    {
+                        userOnlineToCheck.communication.EndTask = true;
+                    }
                 }
+                UsersOnlineToCheck = new List<User> { user };
             }
         }
         private void CreateMainMessage()
@@ -468,7 +505,7 @@ namespace Messenger
             var filePath = $@"{PathChat}\\{normalTime}{nameFile}";
             var sw = new Stopwatch();
             sw.Start();
-            user.communication.ReceiveFile3(filePath);
+            user.communication.ReceiveFile4(filePath);
             sw.Stop();
             Console.WriteLine(sw.Elapsed);
             SendMessageAndAddUser("The file has been sent", user);
@@ -487,14 +524,7 @@ namespace Messenger
                         "If you want to delete yourself, write '?/leave a group'", user);
                     return;
                 }
-                foreach (var userOnline in UsersOnline)
-                {
-                    if (userOnline.Nickname == nickname)
-                    {
-                        userOnline.communication.SendMessage("?/delete");
-                        break;
-                    }
-                }
+                KickPerson(nickname);
                 GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, PathChat, TypeChat, NameChat, fileMaster);
                 await groupsLeaver.Leave();
                 SendMessageAndAddUser("User was deleted", user);
@@ -502,6 +532,33 @@ namespace Messenger
             else
             {
                 SendMessageAndAddUser("Don`t have this nickname", user);
+            }
+        }
+        private void KickPerson(string nickname)
+        {
+            lock (usersOnlineLock)
+            {
+                foreach (var userOnline in UsersOnline)
+                {
+                    if (userOnline.Nickname == nickname)
+                    {
+                        userOnline.communication.EndTask = true;
+                        break;
+                    }
+                }
+                UsersOnline = UsersOnline.Where(user => user.Nickname != nickname).ToList();
+            }
+            lock (usersOnlineToCheckLock)
+            {
+                foreach (var userOnlineToCheck in UsersOnlineToCheck)
+                {
+                    if (userOnlineToCheck.Nickname == nickname)
+                    {
+                        userOnlineToCheck.communication.EndTask = true;
+                        break;
+                    }
+                }
+                UsersOnlineToCheck = UsersOnlineToCheck.Where(user => user.Nickname != nickname).ToList();
             }
         }
         private async Task<bool> CheckHavingNick(string nickname)
@@ -519,18 +576,22 @@ namespace Messenger
                 {
                     user.communication.SendMessageAndAnswerClient(message);
                 }
+                user.UnReadMessages = new List<string>();
             }
         }
         private async Task SendMessageAllUsers(string userNickname, string message)
         {
             var messageSend = $"{userNickname}: {message}\n\r{DateTime.Now.ToString()}";
-            foreach (var userOnline in UsersOnline)
+            lock (usersOnlineLock)
             {
-                userOnline.communication.SendMessage(messageSend);
+                foreach (var userOnline in UsersOnline)
+                {
+                    userOnline.communication.SendMessage(messageSend);
+                }
             }
-            foreach (var userOnlineToCheck in UsersOnlineToCheck)
+            lock (usersOnlineToCheckLock)
             {
-                lock (userOnlineToCheck.MessagesLock)
+                foreach (var userOnlineToCheck in UsersOnlineToCheck)
                 {
                     userOnlineToCheck.UnReadMessages.Add(messageSend);
                 }
