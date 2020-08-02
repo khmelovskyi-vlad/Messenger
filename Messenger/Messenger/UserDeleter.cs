@@ -60,7 +60,7 @@ namespace Messenger
                 {
                     var path = $"{firstPartOfThePast}\\{groupName}\\{lastPartOfThePast}";
                     var needDeleteGroup = false;
-                    await fileMaster.ReadWrite<string>(path, (users) =>
+                    await fileMaster.UpdateFile<string>(path, (users) =>
                     {
                         users.Remove(userNickname);
                         if (lastPartOfThePast == "users.json")
@@ -99,7 +99,7 @@ namespace Messenger
         }
         private async Task ReadWriteData(string path)
         {
-            await fileMaster.ReadWrite<string>(path, (messages) =>
+            await fileMaster.UpdateFile<string>(path, (messages) =>
             {
                 if (messages != null)
                 {
@@ -130,7 +130,7 @@ namespace Messenger
                             path = "";
                             break;
                     }
-                    await fileMaster.ReadWrite<string>(path, (users) =>
+                    await fileMaster.UpdateFile<string>(path, (users) =>
                     {
                         if (users == null)
                         {

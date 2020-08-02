@@ -115,21 +115,21 @@ namespace Messenger
         //        await stream.WriteAsync(dataJson);
         //    }
         //}
-        private class ReaderWriter<T>
+        private class UpdaterFile<T>
         {
-            protected ReaderWriter()
+            protected UpdaterFile()
             {
             }
-            private static ReaderWriter<T> readerWriter = null;
-            public static ReaderWriter<T> Initialize()
+            private static UpdaterFile<T> readerWriter = null;
+            public static UpdaterFile<T> Initialize()
             {
                 if (readerWriter == null)
                 {
-                    readerWriter = new ReaderWriter<T>();
+                    readerWriter = new UpdaterFile<T>();
                 }
                 return readerWriter;
             }
-            public async Task<bool> ReadWrite(string path, Func<List<T>, (List<T>, bool)> func)
+            public async Task<bool> UpdateFile(string path, Func<List<T>, (List<T>, bool)> func)
             {
                 Tuple<AutoResetEvent, FileSystemWatcher> tuple = null;
                 while (true)
@@ -243,11 +243,11 @@ namespace Messenger
         //    Console.WriteLine(readerPersonChat.GetHashCode());
         //    return await readerPersonChat.ReadWrite(path, func);
         //}
-        public async Task<bool> ReadWrite<T>(string path, Func<List<T>, (List<T>, bool)> func)
+        public async Task<bool> UpdateFile<T>(string path, Func<List<T>, (List<T>, bool)> func)
         {
-            var readerPersonChat = ReaderWriter<T>.Initialize();
+            var readerPersonChat = UpdaterFile<T>.Initialize();
             Console.WriteLine(readerPersonChat.GetHashCode());
-            return await readerPersonChat.ReadWrite(path, func);
+            return await readerPersonChat.UpdateFile(path, func);
         }
         public Func<List<T>, (List<T>, bool)> AddData<T>(T data)
         {

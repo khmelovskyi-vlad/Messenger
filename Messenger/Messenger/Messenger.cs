@@ -12,45 +12,62 @@ namespace Messenger
 {
     class Messenger
     {
-        public Messenger()
+        public Messenger(string mainDirectoryPath)
         {
-
+            this.mainDirectoryPath = mainDirectoryPath;
         }
+        private string mainDirectoryPath { get; }
         public List<User> online = new List<User>();
-        public object locketOnline = new object();
-        const int size = 256;
-        private object obj = new object();
-        private string UserFoldersPath { get { return @"D:\temp\messenger\Users"; } }
-        private string PublicGroupsPath { get { return @"D:\temp\messenger\publicGroup"; } }
-        private List<Chat> chats = new List<Chat>();
-        public async Task<bool> Connect(Socket listener)
+        public object OnlineLock = new object();
+        private List<Chat> chats = new List<Chat>(); //needChatLock
+        public async Task<bool> Connect(Socket socket)
         {
-            Connector connector = new Connector(listener, this);
-            var nickname = await connector.Run();
-            if (nickname == "?Disconnect")
+            var result = false;
+            try
             {
-                return false;
-            }
-            if (nickname.Length != 0)
-            {
-                var isOnline = CheckOnline(nickname, listener);
-                if (isOnline)
+                Connector connector = new Connector(socket, this, mainDirectoryPath);
+                var nickname = await connector.Run();
+                if (nickname == "?Disconnect")
                 {
                     return false;
                 }
-                var user = CreateUser(listener, nickname);
-                lock (locketOnline)
+                if (nickname.Length != 0)
                 {
-                    online.Add(user);
+                    var isOnline = CheckOnline(nickname, socket);
+                    if (isOnline)
+                    {
+                        return false;
+                    }
+                    var user = CreateUser(socket, nickname);
+                    lock (OnlineLock)
+                    {
+                        online.Add(user);
+                    }
+                    await FindUseChat(user);
+                    lock (OnlineLock)
+                    {
+                        online.Remove(user);
+                    }
+                    return true;
                 }
-                await FindUseChat(user);
-                lock (locketOnline)
-                {
-                    online.Remove(user);
-                }
-                return true;
+                return false;
             }
-            return false;
+            catch (OperationCanceledException ex)
+            {
+                Console.WriteLine(ex);
+                return result;
+            }
+            catch (Exception socketException)
+            {
+                Console.WriteLine(socketException);
+                //throw socketException;
+                return result;
+            }
+            finally
+            {
+                socket.Close();
+                socket.Dispose();
+            }
         }
         private async Task FindUseChat(User user)
         {
@@ -63,7 +80,7 @@ namespace Messenger
                     if (groupInformation.CanOpenChat)
                     {
                         await OpenCreateChat(user, groupInformation);
-                        if (CheckLeftMessanger(user))
+                        if (await CheckLeftMessanger(user))
                         {
                             break;
                         }
@@ -76,34 +93,34 @@ namespace Messenger
             }
             catch (Exception ex)
             {
-                lock (locketOnline)
+                lock (OnlineLock)
                 {
                     online.Remove(user);
                 }
                 throw ex;
             }
         }
-        private bool CheckLeftMessanger(User user)
+        private async Task<bool> CheckLeftMessanger(User user)
         {
             var result = true;
-            user.communication.AnswerClient();
-            user.communication.SendMessage("If you want to left the messanger, write: 'exit'");
-            user.communication.AnswerClient();
+            await user.communication.AnswerClient();
+            await user.communication.SendMessage("If you want to left the messanger, write: 'exit'");
+            await user.communication.AnswerClient();
             if (user.communication.data.ToString() == "exit")
             {
-                user.communication.SendMessage("You left the messanger");
+                await user.communication.SendMessage("You left the messanger");
             }
             else
             {
-                user.communication.SendMessage("Ok, choose new chat");
+                await user.communication.SendMessage("Ok, choose new chat");
                 result = false;
             }
-            user.communication.AnswerClient();
+            await user.communication.AnswerClient();
             return result;
         }
         private bool CheckOnline(string nickname, Socket listener)
         {
-            lock (locketOnline)
+            lock (OnlineLock)
             {
                 foreach (var user in online)
                 {

@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net; //////////////////////////only for IP, need this?
 using System.Net.Sockets;
@@ -12,24 +13,26 @@ namespace Messenger
 {
     class Connector
     {
-        public Connector(Socket listener, Messenger messenger)
+        public Connector(Socket listener, Messenger messenger, string mainDirectoryPath)
         {
             this.listener = listener;
             IP = ((IPEndPoint)listener.RemoteEndPoint).Address.ToString();
             communication = new Communication(listener);
             this.messenger = messenger;
+            this.mainDirectoryPath = mainDirectoryPath;
         }
+        private string mainDirectoryPath { get; }
         Messenger messenger;
         FileMaster fileMaster = new FileMaster();
         private string IP { get; }
         private Socket listener { get; }
         private Communication communication;
-        private string FilePath { get { return @"D:\temp\messenger\nicknamesAndPasswords\users.json"; } }
-        private string UserFoldersPath { get { return @"D:\temp\messenger\Users"; } }
+        private string FilePath { get { return Path.Combine(mainDirectoryPath,"nicknamesAndPasswords","users.json"); } }
+        private string UserFoldersPath { get { return Path.Combine(mainDirectoryPath, "Users"); } }
         private string nickname = "";
         private async Task<bool> CheckNicknamesBan(string nick)
         {
-            var nicksBan = await fileMaster.ReadAndDeserialize<string>(@"D:\temp\messenger\bans\nicknamesBun.json");
+            var nicksBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(mainDirectoryPath, "bans", "nicknamesBun.json"));
             if (nicksBan != null)
             {
                 foreach (var nickBan in nicksBan)
@@ -44,14 +47,14 @@ namespace Messenger
         }
         private async Task<bool> CheckIPsBan()
         {
-            var IPsBan = await fileMaster.ReadAndDeserialize<string>(@"D:\temp\messenger\bans\IPsBun.json");
+            var IPsBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(mainDirectoryPath,"bans", "IPsBun.json"));
             if (IPsBan != null)
             {
                 foreach (var IPBan in IPsBan)
                 {
                     if (IP == IPBan)
                     {
-                        communication.SendMessage("Your IP is in ban, bye");
+                        await communication.SendMessage("Your IP is in ban, bye");
                         return true;
                     }
                 }
@@ -76,12 +79,12 @@ namespace Messenger
         }
         private async Task<bool> SelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
-            communication.SendMessage("If you want to connect to the server using your account, press Enter,\n\r" +
-                "if you want to create a new account, press Tab,\n\r" +
-                "if you want to log out, click Escape,\n\r" +
-                "if you want to delete your account, click Delete,\n\r" +
-                "if you want to exit the messenger, write '??' at any moment\n\r");
-            communication.AnswerClient();
+            await communication.SendMessage($"If you want to connect to the server using your account, press Enter,{Environment.NewLine}" +
+                $"if you want to create a new account, press Tab,{Environment.NewLine}" +
+                $"if you want to log out, click Escape,{Environment.NewLine}" +
+                $"if you want to delete your account, click Delete,{Environment.NewLine}" +
+                $"if you want to exit the messenger, write '??' at any moment{Environment.NewLine}");
+            await communication.AnswerClient();
             var successConnection = false;
             switch (communication.data.ToString())
             {
@@ -105,15 +108,15 @@ namespace Messenger
         }
         private async Task<bool> DisconectUser(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
-            communication.SendMessage("You realy want to disconect? If yes click Enter");
-            communication.AnswerClient();
+            await communication.SendMessage("You realy want to disconect? If yes click Enter");
+            await communication.AnswerClient();
             if (communication.data.ToString() == "Yes")
             {
-                communication.SendMessage("Ok, bye");
+                await communication.SendMessage("Ok, bye");
                 return false;
             }
-            communication.SendMessage("Сhoose what you want to do");
-            communication.AnswerClient();
+            await communication.SendMessage("Сhoose what you want to do");
+            await communication.AnswerClient();
             return await SelectMode(usersData);
         }
         private async Task<bool> DeleteAccount(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
@@ -123,17 +126,16 @@ namespace Messenger
             {
                 return false;
             }
-            communication.SendMessage("Do you realy want, delete your accaunt? if yes, click Enter");
-            communication.AnswerClient();
+            await communication.SendMessage("Do you realy want, delete your accaunt? if yes, click Enter");
+            await communication.AnswerClient();
             if (communication.data.ToString() != "Yes")
             {
                 return false;
             }
-            var result = await fileMaster.ReadWrite<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
+            var result = await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
             {
                 if (oldData == null)
                 {
-                    communication.SendMessage("Don`t have your data");
                     return (oldData, false);
                 }
                 else
@@ -148,9 +150,13 @@ namespace Messenger
             });
             if (result)
             {
-                communication.SendMessage("Account was deleted");
+                await communication.SendMessage("Account was deleted");
                 UserDeleter userDeleter = new UserDeleter(fileMaster);
                 await userDeleter.Run(userNicknameAndPassword.Nickname, false);
+            }
+            else
+            {
+                await communication.SendMessage("Don`t have this nickname");
             }
             return false;
         }
@@ -163,16 +169,15 @@ namespace Messenger
                     return true;
                 }
             }
-            communication.SendMessage("Don`t have this nickname");
             return false;
         }
         private async Task<bool> CreateNewAccount(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
-            communication.SendMessage("Enter a nickname");
+            await communication.SendMessage("Enter a nickname");
             while (true)
             {
                 var findNick = false;
-                communication.AnswerClient();
+                await communication.AnswerClient();
                 if (userData != null)
                 {
                     foreach (var userNicknameAndPassword in userData)
@@ -180,7 +185,7 @@ namespace Messenger
                         if (communication.data.ToString() == userNicknameAndPassword.Nickname)
                         {
                             findNick = true;
-                            communication.SendMessage("This nickname is currently in use, enter new please");
+                            await communication.SendMessage("This nickname is currently in use, enter new please");
                             break;
                         }
                     }
@@ -200,7 +205,7 @@ namespace Messenger
                 {
                     return false;
                 }
-                var password = CheckPassword(new UserNicknameAndPasswordAndIPs(), false);
+                var password = await CheckPassword(new UserNicknameAndPasswordAndIPs(), false);
                 if (password == "")
                 {
                     if (!CheckWantingToConnect())
@@ -223,12 +228,12 @@ namespace Messenger
                 {
                     if (i == 9)
                     {
-                        lastString = "\n\rYou really want to conect to the server, if yes - click Enter";
+                        lastString = $"{Environment.NewLine}You really want to conect to the server, if yes - click Enter";
                     }
                     var foundSymdol = false;
                     if (communication.data.Length <= 5)
                     {
-                        communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
+                        await communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
                     }
                     else
                     {
@@ -239,8 +244,8 @@ namespace Messenger
                             {
                                 foundSymdol = true;
                                 var invertedComma = '"';
-                                communication.SendMessage($"nickname cannot contain characters such as:\n\r' ', '\\', '/'," +
-                                    $" ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
+                                await communication.SendMessage($"nickname cannot contain characters such as:{Environment.NewLine}" +
+                                    $"' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
                                 break;
                             }
                         }
@@ -254,16 +259,16 @@ namespace Messenger
                                 }
                                 else
                                 {
-                                    communication.SendMessage($"This nickname is online, write else {lastString}");
+                                    await communication.SendMessage($"This nickname is online, write else {lastString}");
                                 }
                             }
                             else
                             {
-                                communication.SendMessage($"This nickname is in ban, write else {lastString}");
+                                await communication.SendMessage($"This nickname is in ban, write else {lastString}");
                             }
                         }
                     }
-                    communication.AnswerClient();
+                    await communication.AnswerClient();
                 }
                 if (!CheckWantingToConnect())
                 {
@@ -273,7 +278,7 @@ namespace Messenger
         }
         private bool CheckNicknamesOnline(string nick)
         {
-            lock (messenger.locketOnline)
+            lock (messenger.OnlineLock)
             {
                 return messenger.online.Select(user => user.Nickname).Contains(nick);
             }
@@ -288,11 +293,11 @@ namespace Messenger
         }
         private async Task<UserNicknameAndPasswordAndIPs> CheckNicknameAndPassword(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
-            communication.SendMessage("Enter a nickname");
-            communication.AnswerClient();
+            await communication.SendMessage("Enter a nickname");
+            await communication.AnswerClient();
             if (userData == null)
             {
-                communication.SendMessage("Don`t have your data");
+                await communication.SendMessage("Don`t have your data");
                 return default(UserNicknameAndPasswordAndIPs);
             }
             while (true)
@@ -308,9 +313,9 @@ namespace Messenger
                     if (nick == userNicknameAndPassword.Nickname)
                     {
                         findNick = true;
-                        if (CheckPassword(userNicknameAndPassword, true) != "")
+                        if (await CheckPassword(userNicknameAndPassword, true) != "")
                         {
-                            communication.SendMessage("You enter to messenger");
+                            await communication.SendMessage("You enter to messenger");
                             nickname = userNicknameAndPassword.Nickname;
                             return userNicknameAndPassword;
                         }
@@ -325,18 +330,18 @@ namespace Messenger
                 }
                 if (!findNick)
                 {
-                    communication.SendMessage("Wrong nickname, enter new");
-                    communication.AnswerClient();
+                    await communication.SendMessage("Wrong nickname, enter new");
+                    await communication.AnswerClient();
                 }
             }
         }
-        private string CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
+        private async Task<string> CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
         {
-            communication.SendMessage("Enter password bigger than 7 symbols");
+            await communication.SendMessage("Enter password bigger than 7 symbols");
             var numberAttemps = 5;
             for (int i = 0; i < numberAttemps; i++)
             {
-                communication.AnswerClient();
+                await communication.AnswerClient();
                 if (CheckPasswordCondition(userNicknameAndPassword, checkHavingPassword))
                 {
                     return communication.data.ToString();
@@ -345,13 +350,13 @@ namespace Messenger
                 {
                     if (i == 4)
                     {
-                        communication.SendMessage($"Password length < 7,\n\r" +
+                        await communication.SendMessage($"Password length < 7,{Environment.NewLine}" +
                             $"You really want to conect to the server, if yes - click Enter");
-                        communication.AnswerClient();
+                        await communication.AnswerClient();
                     }
                     else
                     {
-                        communication.SendMessage($"Password length < 7, enter another password, a number of attemps left = {numberAttemps - i - 1}");
+                        await communication.SendMessage($"Password length < 7, enter another password, a number of attemps left = {numberAttemps - i - 1}");
                     }
                 }
             }
@@ -382,7 +387,7 @@ namespace Messenger
         {
             if (!userNicknameAndPasswordAndIPs.IPs.Contains(IP))
             {
-                await fileMaster.ReadWrite<UserNicknameAndPasswordAndIPs>(FilePath, users =>
+                await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, users =>
                 {
                     var userWithNewIP = users
                     .Where(acc => acc.Nickname == userNicknameAndPasswordAndIPs.Nickname && acc.Password == userNicknameAndPasswordAndIPs.Password)
@@ -403,7 +408,7 @@ namespace Messenger
             var IPs = new List<string>();
             IPs.Add(IP);
             UserNicknameAndPasswordAndIPs userNicknameAndPassword = new UserNicknameAndPasswordAndIPs(userData.First(), userData.Last(), IPs);
-            var result = await fileMaster.ReadWrite<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
+            var result = await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
             {
                 if (oldData == null)
                 {
@@ -421,9 +426,13 @@ namespace Messenger
             });
             if (result)
             {
-                communication.SendMessage("You enter to messenger");
+                await communication.SendMessage("You enter to messenger");
                 fileMaster.CreateDirectory($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
                 nickname = userNicknameAndPassword.Nickname;
+            }
+            else
+            {
+                await communication.SendMessage("This nickname is currently in use, bye");
             }
             return result;
         }
@@ -433,7 +442,6 @@ namespace Messenger
             {
                 if (nick == userData.Nickname)
                 {
-                    communication.SendMessage("This nickname is currently in use, bye");
                     return false;
                 }
             }

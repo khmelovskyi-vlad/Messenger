@@ -17,7 +17,8 @@ namespace Messenger
     {
         static async Task<int> Main(string[] args)
         {
-            Server server = new Server();
+            var mainDirectoryPath = @"D:\temp\messenger";
+            Server server = new Server(mainDirectoryPath);
             await server.Run(5);
             return 1;
         }

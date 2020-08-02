@@ -52,7 +52,7 @@ namespace Messenger
         private async Task<bool> DeleteData(string[] pathsElement)
         {
             var needDeleteGroup = false;
-            await fileMaster.ReadWrite<string>($"{pathChat}\\users.json", users =>
+            await fileMaster.UpdateFile<string>($"{pathChat}\\users.json", users =>
             {
                 users.Remove(userNick);
                 if (users.Count == 0)
@@ -73,7 +73,7 @@ namespace Messenger
             }
             else
             {
-                await fileMaster.ReadWrite<string>($@"D:\temp\messenger\Users\{userNick}\{pathsElement[0]}.json", nameChats =>
+                await fileMaster.UpdateFile<string>($@"D:\temp\messenger\Users\{userNick}\{pathsElement[0]}.json", nameChats =>
                 {
                     return ((nameChats ?? new List<string>())
                     .Where(chat => chat != NameChat)
@@ -84,7 +84,7 @@ namespace Messenger
         }
         private async Task DeletePeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.ReadWrite<PersonChat>($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
+            await fileMaster.UpdateFile<PersonChat>($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
             {
                 if (nameChats != null)
                 {
@@ -107,19 +107,19 @@ namespace Messenger
         }
         private async Task AddData(string[] pathsElement)
         {
-            await fileMaster.ReadWrite($"{pathChat}\\leavedPeople.json", fileMaster.AddData(userNick));
+            await fileMaster.UpdateFile($"{pathChat}\\leavedPeople.json", fileMaster.AddData(userNick));
             if (pathsElement[0] == "peopleChatsBeen")
             {
                 await AddPeopleChatsBeen("leavedPeopleChatsBeen");
             }
             else
             {
-                await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement[1]}.json", fileMaster.AddData(NameChat));
+                await fileMaster.UpdateFile($@"D:\temp\messenger\Users\{userNick}\{pathsElement[1]}.json", fileMaster.AddData(NameChat));
             }
         }
         private async Task AddPeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.ReadWrite($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", fileMaster.AddData(needChat));
+            await fileMaster.UpdateFile($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", fileMaster.AddData(needChat));
         }
         private async Task DeleteGroup()
         {

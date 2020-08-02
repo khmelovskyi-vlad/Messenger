@@ -27,27 +27,24 @@ namespace Messenger
         private const string NicknamesAndPasswordsPath = @"D:\temp\messenger\nicknamesAndPasswords\users.json";
         private const string BansNicknamesPath = @"D:\temp\messenger\bans\nicknamesBun.json";
         private const string BansIPPath = @"D:\temp\messenger\bans\IPsBun.json";
-        private UserNicknameAndPasswordAndIPs user;
         private UserDeleter userDeleter;
         public async Task BanUser()
         {
             while (true)
             {
-                Console.WriteLine("If you want to ban the user by the nickname, press 'n'\n\r" +
-                    "If you want to ban the user by IP, press 'i'\n\r" +
-                    "If you want to unban the IP, press 'u'\n\r" +
-                    "If you want to stop the server, press 's'\n\r" +
-                    "If you want to start the server, press 'r'\n\r" +
-                    "If you want to delete everything except ports, press 'd'\n\r" +
-                    "If you want to delete user, press 'h'\n\r");
+                Console.WriteLine("If you want to ban the user by the nickname, press 'n'");
+                Console.WriteLine("If you want to ban the user by IP, press 'i'");
+                Console.WriteLine("If you want to unban the IP, press 'u'");
+                Console.WriteLine("If you want to stop the server, press 's'");
+                Console.WriteLine("If you want to start the server, press 'r'");
+                Console.WriteLine("If you want to delete everything except ports, press 'd'");
+                Console.WriteLine("If you want to delete user, press 'h'");
                 var key = Console.ReadKey(true);
                 switch (key.Key)
                 {
                     case ConsoleKey.N:
-                        await Baning(key);
-                        break;
                     case ConsoleKey.I:
-                        await Baning(key);
+                        await Ban(key);
                         break;
                     case ConsoleKey.U:
                         await Unban();
@@ -88,9 +85,10 @@ namespace Messenger
         }
         private async Task DeleteUser()
         {
-            if (await FindNeedNick())
+            var (isNickname, user) = await DeleteUserByNickname();
+            if (isNickname)
             {
-                lock (messenger.locketOnline)
+                lock (messenger.OnlineLock)
                 {
                     foreach (var userOnline in messenger.online)
                     {
@@ -137,7 +135,7 @@ namespace Messenger
         private void StopServer()
         {
             server.Connect = false;
-            lock (messenger.locketOnline)
+            lock (messenger.OnlineLock)
             {
                 foreach (var user in messenger.online)
                 {
@@ -149,7 +147,7 @@ namespace Messenger
         {
             Console.WriteLine("Write name IP");
             var IP = Console.ReadLine();
-            await fileMaster.ReadWrite<string>(BansIPPath, banIPs =>
+            await fileMaster.UpdateFile<string>(BansIPPath, banIPs =>
             {
                 if ((banIPs ?? new List<string>()).Contains(IP))
                 {
@@ -164,20 +162,20 @@ namespace Messenger
                 }
             });
         }
-        private async Task Baning(ConsoleKeyInfo key)
+        private async Task Ban(ConsoleKeyInfo key)
         {
-            var foundNick = await FindNeedNick();
-            if (foundNick)
+            var(isNickname, user) = await DeleteUserByNickname();
+            if (isNickname)
             {
-                if (!await CheckBans())
+                if (!await CheckBans(user))
                 {
                     if (key.Key == ConsoleKey.N)
                     {
-                        BanOnNickname();
+                        BanOnNickname(user);
                     }
                     else if (key.Key == ConsoleKey.I)
                     {
-                        BanOnIP();
+                        BanOnIP(user);
                     }
                 }
                 else
@@ -190,7 +188,7 @@ namespace Messenger
                 Console.WriteLine("Don`t have this nickname");
             }
         }
-        private async Task<bool> CheckBans()
+        private async Task<bool> CheckBans(UserNicknameAndPasswordAndIPs user)
         {
             var banUsers = await fileMaster.ReadAndDeserialize<string>(BansNicknamesPath);
             if (banUsers == null)
@@ -199,22 +197,22 @@ namespace Messenger
             }
             return banUsers.Contains(user.Nickname);
         }
-        private async Task<bool> FindNeedNick()
+        private async Task<(bool, UserNicknameAndPasswordAndIPs)> DeleteUserByNickname()
         {
             Console.WriteLine("Write nickname");
             var line = Console.ReadLine();
-            return await CheckAndRemoveNickname(line);
+            return await RemoveUser(line);
         }
-        private async void BanOnIP()
+        private async void BanOnIP(UserNicknameAndPasswordAndIPs user)
         {
-            BanOnNickname();
-            await fileMaster.ReadWrite(BansIPPath, fileMaster.AddSomeData(user.IPs));
+            BanOnNickname(user);
+            await fileMaster.UpdateFile(BansIPPath, fileMaster.AddSomeData(user.IPs));
         }
-        private async void BanOnNickname()
+        private async void BanOnNickname(UserNicknameAndPasswordAndIPs user)
         {
-            await fileMaster.ReadWrite(BansNicknamesPath, fileMaster.AddData(user.Nickname));
+            await fileMaster.UpdateFile(BansNicknamesPath, fileMaster.AddData(user.Nickname));
 
-            lock (messenger.locketOnline)
+            lock (messenger.OnlineLock)
             {
                 foreach (var userOnline in messenger.online)
                 {
@@ -227,21 +225,22 @@ namespace Messenger
             }
             await userDeleter.Run(user.Nickname, true);
         }
-        private async Task<bool> CheckAndRemoveNickname(string nickname)
+        private async Task<(bool, UserNicknameAndPasswordAndIPs)> RemoveUser(string nickname)
         {
-            return await fileMaster.ReadWrite<UserNicknameAndPasswordAndIPs>(NicknamesAndPasswordsPath, users =>
+            var user = new UserNicknameAndPasswordAndIPs();
+            return (await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(NicknamesAndPasswordsPath, users =>
             {
                 if (users == null)
                 {
                     return (users, false);
                 }
                 var findUser = false;
-                foreach (var user in users)
+                foreach (var oneUser in users)
                 {
-                    if (nickname == user.Nickname)
+                    if (nickname == oneUser.Nickname)
                     {
                         findUser = true;
-                        this.user = user;
+                        user = oneUser;
                         break;
                     }
                 }
@@ -251,7 +250,7 @@ namespace Messenger
                     return (users, true);
                 }
                 return (users, false);
-            });
+            }), user);
         }
     }
 }

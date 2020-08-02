@@ -64,7 +64,7 @@ namespace Messenger
         {
             foreach (var path in paths)
             {
-                await fileMaster.ReadWrite<PersonChat>(path, nameChats =>
+                await fileMaster.UpdateFile<PersonChat>(path, nameChats =>
                 {
                     return ((nameChats ?? new List<PersonChat>())
                     .Where(chat => chat.NameChat != NameChat)
@@ -76,7 +76,7 @@ namespace Messenger
         {
             foreach (var path in paths)
             {
-                await fileMaster.ReadWrite<string>(path, users =>
+                await fileMaster.UpdateFile<string>(path, users =>
                 {
                     users.Remove(nameChat);
                     return (users, true);
