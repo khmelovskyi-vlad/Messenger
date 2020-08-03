@@ -15,8 +15,7 @@ namespace Messenger
         public Server(string mainDirectoryPath)
         {
             this.mainDirectoryPath = mainDirectoryPath;
-            fileMaster = new FileMaster(UsersPath);
-            messenger = new Messenger(this, fileMaster);
+            messenger = new Messenger(this);
         }
         public string mainDirectoryPath { get; }
         public string BansPath { get { return Path.Combine(mainDirectoryPath, "bans"); } }
@@ -26,7 +25,6 @@ namespace Messenger
         public string SecretGroupPath { get { return Path.Combine(mainDirectoryPath, "secretGroup"); } }
         public string UsersPath { get { return Path.Combine(mainDirectoryPath, "Users"); } }
         public bool Connect = true;
-        private FileMaster fileMaster;
         public async Task Run(int countListener)
         {
             CreateDirectories();
@@ -38,7 +36,7 @@ namespace Messenger
             while (true)
             {
                 Run();
-                CommandInterpreter banerUsers = new CommandInterpreter(messenger, this, fileMaster);
+                CommandInterpreter banerUsers = new CommandInterpreter(messenger, this);
                 await banerUsers.Run();
             }
         }
@@ -83,7 +81,7 @@ namespace Messenger
         }
         private async Task SetUpPort()
         {
-            await fileMaster.UpdateFile<int>(Path.Combine(mainDirectoryPath, "mainDirectoryPath"), ports =>
+            await FileMaster.UpdateFile<int>(Path.Combine(mainDirectoryPath, "mainDirectoryPath"), ports =>
             {
                 if (ports == null)
                 {
@@ -140,12 +138,12 @@ namespace Messenger
         }
         public void CreateDirectories()
         {
-            fileMaster.CreateDirectory(BansPath);
-            fileMaster.CreateDirectory(NicknamesAndPasswordsPath);
-            fileMaster.CreateDirectory(PeopleChatsPath);
-            fileMaster.CreateDirectory(PublicGroupPath);
-            fileMaster.CreateDirectory(SecretGroupPath);
-            fileMaster.CreateDirectory(UsersPath);
+            FileMaster.CreateDirectory(BansPath);
+            FileMaster.CreateDirectory(NicknamesAndPasswordsPath);
+            FileMaster.CreateDirectory(PeopleChatsPath);
+            FileMaster.CreateDirectory(PublicGroupPath);
+            FileMaster.CreateDirectory(SecretGroupPath);
+            FileMaster.CreateDirectory(UsersPath);
         }
     }
 }

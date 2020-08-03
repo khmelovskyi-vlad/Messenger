@@ -9,19 +9,17 @@ namespace Messenger
 {
     class GroupDeleter
     {
-        public GroupDeleter(string nameGroup, string pathGroup, string typeGroup, string usersPath, FileMaster fileMaster)
+        public GroupDeleter(string nameGroup, string pathGroup, string typeGroup, string usersPath)
         {
             this.NameChat = nameGroup;
             this.PathChat = pathGroup;
             this.TypeChat = typeGroup;
             this.UsersPath = usersPath;
-            this.fileMaster = fileMaster;
         }
         private string NameChat { get; }
         private string PathChat { get; }
         private string TypeChat { get; }
         private string UsersPath { get; }
-        private FileMaster fileMaster;
         public async Task Run()
         {
             var invitationName = "";
@@ -61,13 +59,13 @@ namespace Messenger
                     await DeleteExtraData(leavedPaths, NameChat);
                 }
             }
-            fileMaster.DeleterFolder(PathChat);
+            FileMaster.DeleterFolder(PathChat);
         }
         private async Task DeleteLeavedPeople(List<string> paths)
         {
             foreach (var path in paths)
             {
-                await fileMaster.UpdateFile<PersonChat>(path, nameChats =>
+                await FileMaster.UpdateFile<PersonChat>(path, nameChats =>
                 {
                     return ((nameChats ?? new List<PersonChat>())
                     .Where(chat => chat.NameChat != NameChat)
@@ -79,7 +77,7 @@ namespace Messenger
         {
             foreach (var path in paths)
             {
-                await fileMaster.UpdateFile<string>(path, users =>
+                await FileMaster.UpdateFile<string>(path, users =>
                 {
                     users.Remove(nameChat);
                     return (users, true);
@@ -88,7 +86,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindUserPath(string path, string lastPartOfPath)
         {
-            return ((await fileMaster.ReadAndDeserialize<string>(path))
+            return ((await FileMaster.ReadAndDeserialize<string>(path))
                 ?? new List<string>())
                 .Select(user => Path.Combine(UsersPath, user, lastPartOfPath))
                 .ToList();

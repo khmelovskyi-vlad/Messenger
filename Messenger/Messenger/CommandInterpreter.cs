@@ -10,14 +10,12 @@ namespace Messenger
 {
     class CommandInterpreter
     {
-        public CommandInterpreter(Messenger messenger, Server server, FileMaster fileMaster)
+        public CommandInterpreter(Messenger messenger, Server server)
         {
             this.messenger = messenger;
             this.server = server;
-            this.fileMaster = fileMaster;
-            userDeleter = new UserDeleter(fileMaster, messenger);
+            userDeleter = new UserDeleter(messenger);
         }
-        private FileMaster fileMaster;
         private Server server;
         private Messenger messenger;
         private UserDeleter userDeleter;
@@ -113,12 +111,12 @@ namespace Messenger
         }
         private void DeleteDirectories()
         {
-            fileMaster.DeleterFolder(messenger.Server.BansPath);
-            fileMaster.DeleterFolder(messenger.Server.NicknamesAndPasswordsPath);
-            fileMaster.DeleterFolder(messenger.Server.PeopleChatsPath);
-            fileMaster.DeleterFolder(messenger.Server.PublicGroupPath);
-            fileMaster.DeleterFolder(messenger.Server.SecretGroupPath);
-            fileMaster.DeleterFolder(messenger.Server.UsersPath);
+            FileMaster.DeleterFolder(messenger.Server.BansPath);
+            FileMaster.DeleterFolder(messenger.Server.NicknamesAndPasswordsPath);
+            FileMaster.DeleterFolder(messenger.Server.PeopleChatsPath);
+            FileMaster.DeleterFolder(messenger.Server.PublicGroupPath);
+            FileMaster.DeleterFolder(messenger.Server.SecretGroupPath);
+            FileMaster.DeleterFolder(messenger.Server.UsersPath);
         }
         private void StartServer()
         {
@@ -140,7 +138,7 @@ namespace Messenger
         {
             Console.WriteLine("Write name IP");
             var IP = Console.ReadLine();
-            await fileMaster.UpdateFile<string>(Path.Combine(messenger.Server.BansPath, "IPsBun.json"), banIPs =>
+            await FileMaster.UpdateFile<string>(Path.Combine(messenger.Server.BansPath, "IPsBun.json"), banIPs =>
             {
                 if ((banIPs ?? new List<string>()).Contains(IP))
                 {
@@ -183,7 +181,7 @@ namespace Messenger
         }
         private async Task<bool> CheckBans(UserNicknameAndPasswordAndIPs user)
         {
-            var banUsers = await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"));
+            var banUsers = await FileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"));
             if (banUsers == null)
             {
                 return false;
@@ -199,11 +197,11 @@ namespace Messenger
         private async void BanOnIP(UserNicknameAndPasswordAndIPs user)
         {
             BanOnNickname(user);
-            await fileMaster.UpdateFile(Path.Combine(messenger.Server.BansPath, "IPsBun.json"), fileMaster.AddSomeData(user.IPs));
+            await FileMaster.UpdateFile(Path.Combine(messenger.Server.BansPath, "IPsBun.json"), FileMaster.AddSomeData(user.IPs));
         }
         private async void BanOnNickname(UserNicknameAndPasswordAndIPs user)
         {
-            await fileMaster.UpdateFile(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"), fileMaster.AddData(user.Nickname));
+            await FileMaster.UpdateFile(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"), FileMaster.AddData(user.Nickname));
 
             lock (messenger.OnlineLock)
             {
@@ -221,7 +219,7 @@ namespace Messenger
         private async Task<(bool, UserNicknameAndPasswordAndIPs)> RemoveUser(string nickname)
         {
             var user = new UserNicknameAndPasswordAndIPs();
-            return (await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>
+            return (await FileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>
                 (Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json"), users =>
             {
                 if (users == null)

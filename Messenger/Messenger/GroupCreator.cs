@@ -12,19 +12,17 @@ namespace Messenger
 {
     class GroupCreator
     {
-        public GroupCreator(User user, Messenger messenger, FileMaster fileMaster)
+        public GroupCreator(User user, Messenger messenger)
         {
             this.user = user;
             this.messenger = messenger;
-            this.fileMaster = fileMaster;
         }
         private Messenger messenger;
         private User user;
         private string AskForClien { get { return $"Who do you want to invite to your group?{Environment.NewLine}" +
                 $"If you want to check people, write ?/yes{Environment.NewLine}" +
                 $"If you don`t want to add people, write ?/no{Environment.NewLine}";}}
-
-        FileMaster fileMaster;
+        
         private async Task<string> SelectTypeGroup()
         {
             await SendMessage($"What type of group do you want?{Environment.NewLine}" +
@@ -67,12 +65,12 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pg":
-                    return !(fileMaster.GetDirectories(messenger.Server.PublicGroupPath) ?? new string[0])
-                        .Select(path => fileMaster.GetFileName(path))
+                    return !(FileMaster.GetDirectories(messenger.Server.PublicGroupPath) ?? new string[0])
+                        .Select(path => FileMaster.GetFileName(path))
                         .Contains(nameGroup);
                 default: //(sg)
-                    return !(fileMaster.GetDirectories(messenger.Server.SecretGroupPath) ?? new string[0])
-                        .Select(path => fileMaster.GetFileName(path))
+                    return !(FileMaster.GetDirectories(messenger.Server.SecretGroupPath) ?? new string[0])
+                        .Select(path => FileMaster.GetFileName(path))
                         .Contains(nameGroup);
             }
         }
@@ -162,9 +160,9 @@ namespace Messenger
                     pathGroup = Path.Combine(messenger.Server.SecretGroupPath, nameGroup);
                     break;
             }
-            fileMaster.CreateDirectory(pathGroup);
-            await fileMaster.UpdateFile(Path.Combine(pathGroup, "users.json"), fileMaster.AddData(user.Nickname));
-            await fileMaster.UpdateFile(Path.Combine(pathGroup, "invitation.json"), fileMaster.AddSomeData(invitedPeople));
+            FileMaster.CreateDirectory(pathGroup);
+            await FileMaster.UpdateFile(Path.Combine(pathGroup, "users.json"), FileMaster.AddData(user.Nickname));
+            await FileMaster.UpdateFile(Path.Combine(pathGroup, "invitation.json"), FileMaster.AddSomeData(invitedPeople));
             return pathGroup;
         }
         private async Task InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
@@ -198,7 +196,7 @@ namespace Messenger
             {
                 data = nameGroup;
             }
-            await fileMaster.UpdateFile(path, fileMaster.AddData(data));
+            await FileMaster.UpdateFile(path, FileMaster.AddData(data));
         }
         private async Task SendGroups(IEnumerable<string> groups, string firstMassage)
         {
@@ -220,7 +218,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindChatsPeople()
         {
-            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
+            return ((await FileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Where(nickname => nickname != user.Nickname)

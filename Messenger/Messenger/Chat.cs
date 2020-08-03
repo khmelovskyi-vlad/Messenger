@@ -14,13 +14,12 @@ namespace Messenger
 {
     class Chat
     {
-        public Chat(string typtChat, string nameChat, string pathChat, Messenger messenger, FileMaster fileMaster)
+        public Chat(string typtChat, string nameChat, string pathChat, Messenger messenger)
         {
             this.TypeChat = typtChat;
             this.NameChat = nameChat;
             this.PathChat = pathChat;
             this.messenger = messenger;
-            this.fileMaster = fileMaster;
         }
         public string NameChat { get; set; }
         private string TypeChat { get; set; }
@@ -33,7 +32,6 @@ namespace Messenger
         private List<string> messages;
         private object messagesLock = new object();
         private string message;
-        private FileMaster fileMaster;
 
         public async Task Run(User user, bool firstConnect)
         {
@@ -124,7 +122,7 @@ namespace Messenger
             await user.communication.SendMessageAndAnswerClient("You really want to leave a group? If yes write: 'yes'");
             if (user.communication.data.ToString() == "yes")
             {
-                GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath, fileMaster);
+                GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath);
                 await groupsLeaver.Leave();
                 lock (usersOnlineToCheckLock)
                 {
@@ -248,8 +246,8 @@ namespace Messenger
                     partInvitation = "";
                     break;
             }
-            await fileMaster.UpdateFile(Path.Combine(messenger.Server.UsersPath, namePerson, "invitation.json"), fileMaster.AddData($"{partInvitation}{NameChat}"));
-            await fileMaster.UpdateFile(Path.Combine(PathChat, namePerson, "invitation.json"), fileMaster.AddData(namePerson));
+            await FileMaster.UpdateFile(Path.Combine(messenger.Server.UsersPath, namePerson, "invitation.json"), FileMaster.AddData($"{partInvitation}{NameChat}"));
+            await FileMaster.UpdateFile(Path.Combine(PathChat, namePerson, "invitation.json"), FileMaster.AddData(namePerson));
         }
         private async Task WriteData(string path, string data)
         {
@@ -260,7 +258,7 @@ namespace Messenger
         }
         private async Task<bool> CheckPerson(string namePerson)
         {
-            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
+            return ((await FileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Contains(namePerson);
@@ -285,7 +283,7 @@ namespace Messenger
             return true;
             async Task<bool> CheckUsersLeavedPeopleInvitation(string path)
             {
-                var users = await fileMaster.ReadAndDeserialize<string>(path);
+                var users = await FileMaster.ReadAndDeserialize<string>(path);
                 if (users == null)
                 {
                     users = new List<string>();
@@ -361,7 +359,7 @@ namespace Messenger
         }
         private async Task AddInvitation(string path, string data)
         {
-            await fileMaster.UpdateFile(path, fileMaster.AddData(data));
+            await FileMaster.UpdateFile(path, FileMaster.AddData(data));
         }
         private async Task AddUserToGroups(string userPath, string nameGroup, string typeGroup, User user)
         {
@@ -377,15 +375,15 @@ namespace Messenger
                 default:
                     return;
             }
-            await fileMaster.UpdateFile(Path.Combine(userPath, partPath), fileMaster.AddData(nameGroup));
-            await fileMaster.UpdateFile<string>(Path.Combine(PathChat, "users.json"), users =>
+            await FileMaster.UpdateFile(Path.Combine(userPath, partPath), FileMaster.AddData(nameGroup));
+            await FileMaster.UpdateFile<string>(Path.Combine(PathChat, "users.json"), users =>
             {
                 return (new List<string>() { user.Nickname }, true);
             });
         }
         private async Task<string> FindAnotherUser(User user)
         {
-            return (await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
+            return (await FileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
                 .Where(x => x != user.Nickname)
                 .FirstOrDefault();
         }
@@ -393,7 +391,7 @@ namespace Messenger
         {
             foreach (var userPath in usersPath)
             {
-                await fileMaster.UpdateFile<PersonChat>(Path.Combine(userPath, "peopleChatsBeen.json"), groups =>
+                await FileMaster.UpdateFile<PersonChat>(Path.Combine(userPath, "peopleChatsBeen.json"), groups =>
                 {
                     return (groups.Where(group => group.NameChat != NameChat).ToList(), true);
                 });
@@ -527,7 +525,7 @@ namespace Messenger
                     return;
                 }
                 KickPerson(nickname);
-                GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath, fileMaster);
+                GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath);
                 await groupsLeaver.Leave();
                 await SendMessageAndAddUser("User was deleted", user);
             }
@@ -565,7 +563,7 @@ namespace Messenger
         }
         private async Task<bool> CheckHavingNick(string nickname)
         {
-            return ((await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
+            return ((await FileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
                 ?? new List<string>())
                 .Contains(nickname);
         }
@@ -607,11 +605,11 @@ namespace Messenger
         }
         private async Task SaveMessage(string message)
         {
-            await fileMaster.UpdateFile(Path.Combine(PathChat, "data.json"), fileMaster.AddData(message));
+            await FileMaster.UpdateFile(Path.Combine(PathChat, "data.json"), FileMaster.AddData(message));
         }
         private async Task FirstRead()
         {
-            this.messages = await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "data.json")) ?? new List<string>();
+            this.messages = await FileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "data.json")) ?? new List<string>();
         }
 
 

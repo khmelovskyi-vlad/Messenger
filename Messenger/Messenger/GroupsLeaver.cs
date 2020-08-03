@@ -10,14 +10,13 @@ namespace Messenger
 {
     class GroupsLeaver
     {
-        public GroupsLeaver(string userNick, string nameGroup, string pathGroup, string typeGroup, string usersPath, FileMaster fileMaster)
+        public GroupsLeaver(string userNick, string nameGroup, string pathGroup, string typeGroup, string usersPath)
         {
             this.NameGroup = nameGroup;
             this.UserNick = userNick;
             this.PathGroup = pathGroup;
             this.TypeGroup = typeGroup;
             this.UsersPath = usersPath;
-            this.fileMaster = fileMaster;
             needChat = new PersonChat();
         }
         private string NameGroup { get; }
@@ -25,7 +24,6 @@ namespace Messenger
         private string PathGroup { get; }
         private string TypeGroup { get; }
         private string UsersPath { get; }
-        private FileMaster fileMaster;
         private PersonChat needChat;
         public async Task<bool> Leave()
         {
@@ -55,7 +53,7 @@ namespace Messenger
         private async Task<bool> DeleteData(string[] pathsElement)
         {
             var needDeleteGroup = false;
-            await fileMaster.UpdateFile<string>(Path.Combine(PathGroup, "users.json"), users =>
+            await FileMaster.UpdateFile<string>(Path.Combine(PathGroup, "users.json"), users =>
             {
                 users.Remove(UserNick);
                 if (users.Count == 0)
@@ -76,7 +74,7 @@ namespace Messenger
             }
             else
             {
-                await fileMaster.UpdateFile<string>(Path.Combine(UsersPath, UserNick, pathsElement[0]), nameChats =>
+                await FileMaster.UpdateFile<string>(Path.Combine(UsersPath, UserNick, pathsElement[0]), nameChats =>
                 {
                     return ((nameChats ?? new List<string>())
                     .Where(group => group != NameGroup)
@@ -87,7 +85,7 @@ namespace Messenger
         }
         private async Task DeletePeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.UpdateFile<PersonChat>(Path.Combine(UsersPath, UserNick, pathsElement), nameChats =>
+            await FileMaster.UpdateFile<PersonChat>(Path.Combine(UsersPath, UserNick, pathsElement), nameChats =>
             {
                 if (nameChats != null)
                 {
@@ -110,23 +108,23 @@ namespace Messenger
         }
         private async Task AddData(string[] pathsElement)
         {
-            await fileMaster.UpdateFile(Path.Combine(PathGroup, "leavedPeople.json"), fileMaster.AddData(UserNick));
+            await FileMaster.UpdateFile(Path.Combine(PathGroup, "leavedPeople.json"), FileMaster.AddData(UserNick));
             if (pathsElement[0] == "peopleChatsBeen.json")
             {
                 await AddPeopleChatsBeen(pathsElement[1]);
             }
             else
             {
-                await fileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement[1]), fileMaster.AddData(NameGroup));
+                await FileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement[1]), FileMaster.AddData(NameGroup));
             }
         }
         private async Task AddPeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement), fileMaster.AddData(needChat));
+            await FileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement), FileMaster.AddData(needChat));
         }
         private async Task DeleteGroup()
         {
-            GroupDeleter groupDeleter = new GroupDeleter(NameGroup, PathGroup, TypeGroup, UsersPath, fileMaster);
+            GroupDeleter groupDeleter = new GroupDeleter(NameGroup, PathGroup, TypeGroup, UsersPath);
             await groupDeleter.Run();
         }
     }

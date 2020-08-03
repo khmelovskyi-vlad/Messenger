@@ -13,16 +13,14 @@ namespace Messenger
 {
     class Connector
     {
-        public Connector(Socket socket, Messenger messenger, FileMaster fileMaster)
+        public Connector(Socket socket, Messenger messenger)
         {
             this.listener = socket;
             IP = ((IPEndPoint)socket.RemoteEndPoint).Address.ToString();
             communication = new Communication(socket);
             this.messenger = messenger;
-            this.fileMaster = fileMaster;
         }
         Messenger messenger;
-        FileMaster fileMaster;
         private string IP { get; }
         private Socket listener { get; }
         private Communication communication;
@@ -30,7 +28,7 @@ namespace Messenger
         private string nickname = "";
         private async Task<bool> CheckNicknamesBan(string nick)
         {
-            var nicksBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"));
+            var nicksBan = await FileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"));
             if (nicksBan != null)
             {
                 foreach (var nickBan in nicksBan)
@@ -46,7 +44,7 @@ namespace Messenger
         private async Task<bool> CheckIPsBan()
         {
             var path = Path.Combine(messenger.Server.BansPath, "IPsBun.json");
-            var IPsBan = await fileMaster.ReadAndDeserialize<string>(path);
+            var IPsBan = await FileMaster.ReadAndDeserialize<string>(path);
             if (IPsBan != null)
             {
                 foreach (var IPBan in IPsBan)
@@ -131,7 +129,7 @@ namespace Messenger
             {
                 return false;
             }
-            var result = await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
+            var result = await FileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
             {
                 if (oldData == null)
                 {
@@ -150,7 +148,7 @@ namespace Messenger
             if (result)
             {
                 await communication.SendMessage("Account was deleted");
-                UserDeleter userDeleter = new UserDeleter(fileMaster, messenger);
+                UserDeleter userDeleter = new UserDeleter(messenger);
                 await userDeleter.Run(userNicknameAndPassword.Nickname, false);
             }
             else
@@ -378,7 +376,7 @@ namespace Messenger
         {
             if (!userNicknameAndPasswordAndIPs.IPs.Contains(IP))
             {
-                await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, users =>
+                await FileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, users =>
                 {
                     var userWithNewIP = users
                     .Where(acc => acc.Nickname == userNicknameAndPasswordAndIPs.Nickname && acc.Password == userNicknameAndPasswordAndIPs.Password)
@@ -392,14 +390,14 @@ namespace Messenger
         }
         private async Task<IEnumerable<UserNicknameAndPasswordAndIPs>> TakeAllUserData()
         {
-            return await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(FilePath);
+            return await FileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(FilePath);
         }
         private async Task<bool> AddNewUser(IEnumerable<string> userData)
         {
             var IPs = new List<string>();
             IPs.Add(IP);
             UserNicknameAndPasswordAndIPs userNicknameAndPassword = new UserNicknameAndPasswordAndIPs(userData.First(), userData.Last(), IPs);
-            var result = await fileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
+            var result = await FileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
             {
                 if (oldData == null)
                 {
@@ -418,7 +416,7 @@ namespace Messenger
             if (result)
             {
                 await communication.SendMessage("You enter to messenger");
-                fileMaster.CreateDirectory(Path.Combine(messenger.Server.UsersPath, userNicknameAndPassword.Nickname));
+                FileMaster.CreateDirectory(Path.Combine(messenger.Server.UsersPath, userNicknameAndPassword.Nickname));
                 nickname = userNicknameAndPassword.Nickname;
             }
             else

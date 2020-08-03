@@ -12,19 +12,17 @@ namespace Messenger
 {
     class GroupMaster
     {
-        public GroupMaster(User user, Messenger messenger, FileMaster fileMaster)
+        public GroupMaster(User user, Messenger messenger)
         {
             this.user = user;
             this.messenger = messenger;
-            this.fileMaster = fileMaster;
         }
         private User user;
         private Messenger messenger;
-        private FileMaster fileMaster;
         private UserChats userChats;
         public async Task<GroupInformation> Run()
         {
-            userChats = new UserChats(fileMaster, user.Nickname, messenger);
+            userChats = new UserChats(user.Nickname, messenger);
             await userChats.FindAllChats();
             await SendChats(false);
             return await ModeSelection();
@@ -128,14 +126,14 @@ namespace Messenger
             WriteNewPerson(Path.Combine(messenger.Server.UsersPath, user.Nickname, "peopleChatsBeen.json"), personChat);
             WriteNewPerson(Path.Combine(messenger.Server.UsersPath, namePerson, "peopleChatsBeen.json"), personChat);
             var path = Path.Combine(messenger.Server.PeopleChatsPath, nameChat);
-            fileMaster.CreateDirectory(path);
+            FileMaster.CreateDirectory(path);
             await AddData(Path.Combine(path, "users.json"), user.Nickname);
             await AddData(Path.Combine(path, "users.json"), namePerson);
             return new GroupInformation(true, typeGroup, nameChat, path);
         }
         private async void WriteNewPerson(string path, PersonChat personChat)
         {
-            await fileMaster.UpdateFile(path, fileMaster.AddData(personChat));
+            await FileMaster.UpdateFile(path, FileMaster.AddData(personChat));
         }
         private async Task<GroupInformation> CheckChatAndCreatePath(string nameGroup, string typeGroup)
         {
@@ -192,7 +190,7 @@ namespace Messenger
         }
         private async Task<bool> CheckDeleteInvitation(string path, string data)
         {
-            return await fileMaster.UpdateFile<string>(path, invitations =>
+            return await FileMaster.UpdateFile<string>(path, invitations =>
             {
                 if (invitations == null)
                 {
@@ -212,7 +210,7 @@ namespace Messenger
         }
         private async Task AddData(string path, string data)
         {
-            await fileMaster.UpdateFile<string>(path, allData =>
+            await FileMaster.UpdateFile<string>(path, allData =>
             {
                 if (allData == null)
                 {
@@ -308,11 +306,11 @@ namespace Messenger
         }
         private async Task AddUserOrGroup(string path, string information)
         {
-            await fileMaster.UpdateFile(path, fileMaster.AddData(information));
+            await FileMaster.UpdateFile(path, FileMaster.AddData(information));
         }
         private async Task DeleteInvitation(string path, string invitation)
         {
-            await fileMaster.UpdateFile<string>(path, users =>
+            await FileMaster.UpdateFile<string>(path, users =>
             {
                 users.Remove(invitation);
                 return (users, true);
@@ -355,7 +353,7 @@ namespace Messenger
         }
         private async Task<GroupInformation> CreateNewGroup()
         {
-            GroupCreator creatorGroups = new GroupCreator(user, messenger, fileMaster);
+            GroupCreator creatorGroups = new GroupCreator(user, messenger);
             return await creatorGroups.Run();
         }
         private async Task HelpFindChat(string message)

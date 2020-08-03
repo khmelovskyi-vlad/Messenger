@@ -9,40 +9,40 @@ using System.Threading.Tasks;
 
 namespace Messenger
 {
-    class FileMaster
+    static class FileMaster
     {
-        public FileMaster(string usersPath)
-        {
-            this.UsersPath = usersPath;
-        }
-        private string UsersPath { get; }
+        //public FileMaster(string usersPath)
+        //{
+        //    this.UsersPath = usersPath;
+        //}
+        //private string UsersPath { get; }
 
 
-        public void DeleterFolder(string path)
+        static public void DeleterFolder(string path)
         {
             Directory.Delete(path, true);
         }
-        public void CreateDirectory(string path)
+        static public void CreateDirectory(string path)
         {
             Directory.CreateDirectory(path);
         }
-        public string[] GetDirectories(string path)
+        static public string[] GetDirectories(string path)
         {
             return Directory.GetDirectories(path);
         }
-        public string GetFileName(string path)
+        static public string GetFileName(string path)
         {
             return Path.GetFileName(path);
         }
-        public string[] ReadUsersPaths()
+        static public string[] ReadUsersPaths()
         {
-            return Directory.GetFiles(UsersPath);
+            return Directory.GetFiles(@"D:\temp\messenger\Users");
         }
-        public async Task<List<T>> ReadAndDeserialize<T>(string path)
+        static public async Task<List<T>> ReadAndDeserialize<T>(string path)
         {
             return JsonConvert.DeserializeObject<List<T>>(await ReadData(path));
         }
-        public async Task<string> ReadData(string path)
+        static public async Task<string> ReadData(string path)
         {
             Tuple<AutoResetEvent, FileSystemWatcher> tuple = null;
             while (true)
@@ -84,7 +84,7 @@ namespace Messenger
             }
             Dispose(tuple);
         }
-        private void Dispose(Tuple<AutoResetEvent, FileSystemWatcher> tuple)
+        static private void Dispose(Tuple<AutoResetEvent, FileSystemWatcher> tuple)
         {
             if (tuple != null && tuple.Item1 != null) // Dispose of resources now (don't wait the GC).
             {
@@ -92,7 +92,7 @@ namespace Messenger
                 tuple.Item2.Dispose();
             }
         }
-        private async Task<string> ReadData(FileStream stream)
+        static private async Task<string> ReadData(FileStream stream)
         {
             var sb = new StringBuilder();
             var count = 256;
@@ -244,13 +244,13 @@ namespace Messenger
         //    Console.WriteLine(readerPersonChat.GetHashCode());
         //    return await readerPersonChat.ReadWrite(path, func);
         //}
-        public async Task<bool> UpdateFile<T>(string path, Func<List<T>, (List<T>, bool)> func)
+        static public async Task<bool> UpdateFile<T>(string path, Func<List<T>, (List<T>, bool)> func)
         {
             var readerPersonChat = UpdaterFile<T>.Initialize();
             Console.WriteLine(readerPersonChat.GetHashCode());
             return await readerPersonChat.UpdateFile(path, func);
         }
-        public Func<List<T>, (List<T>, bool)> AddData<T>(T data)
+        static public Func<List<T>, (List<T>, bool)> AddData<T>(T data)
         {
             return (datas =>
             {
@@ -262,7 +262,7 @@ namespace Messenger
                 return (datas, true);
             });
         }
-        public Func<List<T>, (List<T>, bool)> AddSomeData<T>(List<T> someData)
+        static public Func<List<T>, (List<T>, bool)> AddSomeData<T>(List<T> someData)
         {
             return (datas =>
             {
@@ -274,7 +274,7 @@ namespace Messenger
                 return (datas, true);
             });
         }
-        private void SetLastWriteTime(string path)
+        static private void SetLastWriteTime(string path)
         {
             File.SetLastWriteTime(path, DateTime.Now);
         }

@@ -12,13 +12,11 @@ namespace Messenger
 {
     class Messenger
     {
-        public Messenger(Server server, FileMaster fileMaster)
+        public Messenger(Server server)
         {
             this.Server = server;
-            this.fileMaster = fileMaster;
         }
         public Server Server;
-        private FileMaster fileMaster;
         public List<User> online = new List<User>();
         public object OnlineLock = new object();
         private List<Chat> chats = new List<Chat>(); //needChatLock
@@ -27,7 +25,7 @@ namespace Messenger
             var result = false;
             try
             {
-                Connector connector = new Connector(socket, this, fileMaster);
+                Connector connector = new Connector(socket, this);
                 var nickname = await connector.Run();
                 if (nickname == "?Disconnect")
                 {
@@ -77,7 +75,7 @@ namespace Messenger
             {
                 while (true)
                 {
-                    GroupMaster groupMaster = new GroupMaster(user, this, fileMaster);
+                    GroupMaster groupMaster = new GroupMaster(user, this);
                     var groupInformation = await groupMaster.Run();
                     if (groupInformation.CanOpenChat)
                     {
@@ -149,7 +147,7 @@ namespace Messenger
             }
             if (!findChat)
             {
-                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path, this, fileMaster);
+                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path, this);
                 chats.Add(chat);
                 await chat.Run(user, true);
                 CheckOnline(chat);
