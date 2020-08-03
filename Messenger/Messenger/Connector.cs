@@ -13,26 +13,24 @@ namespace Messenger
 {
     class Connector
     {
-        public Connector(Socket listener, Messenger messenger, string mainDirectoryPath)
+        public Connector(Socket socket, Messenger messenger, FileMaster fileMaster)
         {
-            this.listener = listener;
-            IP = ((IPEndPoint)listener.RemoteEndPoint).Address.ToString();
-            communication = new Communication(listener);
+            this.listener = socket;
+            IP = ((IPEndPoint)socket.RemoteEndPoint).Address.ToString();
+            communication = new Communication(socket);
             this.messenger = messenger;
-            this.mainDirectoryPath = mainDirectoryPath;
+            this.fileMaster = fileMaster;
         }
-        private string mainDirectoryPath { get; }
         Messenger messenger;
-        FileMaster fileMaster = new FileMaster();
+        FileMaster fileMaster;
         private string IP { get; }
         private Socket listener { get; }
         private Communication communication;
-        private string FilePath { get { return Path.Combine(mainDirectoryPath,"nicknamesAndPasswords","users.json"); } }
-        private string UserFoldersPath { get { return Path.Combine(mainDirectoryPath, "Users"); } }
+        private string FilePath { get { return Path.Combine(messenger.Server.NicknamesAndPasswordsPath,"users.json"); } }
         private string nickname = "";
         private async Task<bool> CheckNicknamesBan(string nick)
         {
-            var nicksBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(mainDirectoryPath, "bans", "nicknamesBun.json"));
+            var nicksBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.BansPath, "nicknamesBun.json"));
             if (nicksBan != null)
             {
                 foreach (var nickBan in nicksBan)
@@ -47,7 +45,8 @@ namespace Messenger
         }
         private async Task<bool> CheckIPsBan()
         {
-            var IPsBan = await fileMaster.ReadAndDeserialize<string>(Path.Combine(mainDirectoryPath,"bans", "IPsBun.json"));
+            var path = Path.Combine(messenger.Server.BansPath, "IPsBun.json");
+            var IPsBan = await fileMaster.ReadAndDeserialize<string>(path);
             if (IPsBan != null)
             {
                 foreach (var IPBan in IPsBan)
@@ -151,7 +150,7 @@ namespace Messenger
             if (result)
             {
                 await communication.SendMessage("Account was deleted");
-                UserDeleter userDeleter = new UserDeleter(fileMaster);
+                UserDeleter userDeleter = new UserDeleter(fileMaster, messenger);
                 await userDeleter.Run(userNicknameAndPassword.Nickname, false);
             }
             else
@@ -230,26 +229,14 @@ namespace Messenger
                     {
                         lastString = $"{Environment.NewLine}You really want to conect to the server, if yes - click Enter";
                     }
-                    var foundSymdol = false;
                     if (communication.data.Length <= 5)
                     {
                         await communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
                     }
                     else
                     {
-                        foreach (var symbol in communication.data.ToString())
-                        {
-                            if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
-                                || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
-                            {
-                                foundSymdol = true;
-                                var invertedComma = '"';
-                                await communication.SendMessage($"nickname cannot contain characters such as:{Environment.NewLine}" +
-                                    $"' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|' {lastString}");
-                                break;
-                            }
-                        }
-                        if(!foundSymdol)
+                        var goodInput = CharacterCheckers.CheckInput(communication.data.ToString());
+                        if(goodInput)
                         {
                             if (!await CheckNicknamesBan(communication.data.ToString()))
                             {
@@ -266,6 +253,10 @@ namespace Messenger
                             {
                                 await communication.SendMessage($"This nickname is in ban, write else {lastString}");
                             }
+                        }
+                        else
+                        {
+                            await communication.SendMessage($"The nickname can only contain lowercase letters and numbers {lastString}");
                         }
                     }
                     await communication.AnswerClient();
@@ -427,7 +418,7 @@ namespace Messenger
             if (result)
             {
                 await communication.SendMessage("You enter to messenger");
-                fileMaster.CreateDirectory($"{UserFoldersPath}\\{userNicknameAndPassword.Nickname}");
+                fileMaster.CreateDirectory(Path.Combine(messenger.Server.UsersPath, userNicknameAndPassword.Nickname));
                 nickname = userNicknameAndPassword.Nickname;
             }
             else

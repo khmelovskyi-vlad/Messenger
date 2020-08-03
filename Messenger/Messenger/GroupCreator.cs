@@ -10,20 +10,21 @@ using System.Threading.Tasks;
 
 namespace Messenger
 {
-    class CreatorGroups
+    class GroupCreator
     {
-        public CreatorGroups(User user)
+        public GroupCreator(User user, Messenger messenger, FileMaster fileMaster)
         {
             this.user = user;
+            this.messenger = messenger;
+            this.fileMaster = fileMaster;
         }
-        private string PublicGroupsPath { get { return @"D:\temp\messenger\publicGroup"; } }
-        private string SecreatGroupsPath { get { return @"D:\temp\messenger\secretGroup"; } }
+        private Messenger messenger;
         private User user;
-        private string askForClien { get { return $"Who do you want to invite to your group?{Environment.NewLine}" +
+        private string AskForClien { get { return $"Who do you want to invite to your group?{Environment.NewLine}" +
                 $"If you want to check people, write ?/yes{Environment.NewLine}" +
                 $"If you don`t want to add people, write ?/no{Environment.NewLine}";}}
 
-        FileMaster fileMaster = new FileMaster();
+        FileMaster fileMaster;
         private async Task<string> SelectTypeGroup()
         {
             await SendMessage($"What type of group do you want?{Environment.NewLine}" +
@@ -47,21 +48,10 @@ namespace Messenger
             {
                 await AnswerClient();
                 var groupName = user.communication.data.ToString();
-                var findSymdol = false;
-                foreach (var symbol in groupName)
+                var goodInput = CharacterCheckers.CheckInput(groupName);
+                if (!goodInput)
                 {
-                    if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
-                        || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
-                    {
-                        findSymdol = true;
-                        var invertedComma = '"';
-                        await SendMessage($"nickname cannot contain characters such as:{Environment.NewLine}" +
-                            $"' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|'");
-                        break;
-                    }
-                }
-                if (findSymdol)
-                {
+                    await SendMessage("The group name can only contain lowercase letters and numbers");
                     continue;
                 }
                 else if (!CheckGroups(groupName, typeGroup))
@@ -77,11 +67,11 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pg":
-                    return !(fileMaster.GetDirectories(@"D:\temp\messenger\publicGroup") ?? new string[0])
+                    return !(fileMaster.GetDirectories(messenger.Server.PublicGroupPath) ?? new string[0])
                         .Select(path => fileMaster.GetFileName(path))
                         .Contains(nameGroup);
                 default: //(sg)
-                    return !(fileMaster.GetDirectories(@"D:\temp\messenger\secretGroup") ?? new string[0])
+                    return !(fileMaster.GetDirectories(messenger.Server.SecretGroupPath) ?? new string[0])
                         .Select(path => fileMaster.GetFileName(path))
                         .Contains(nameGroup);
             }
@@ -90,7 +80,7 @@ namespace Messenger
         {
             var typeGroup = await SelectTypeGroup();
             var nameGroup = await SelectGroupName(typeGroup);
-            await SendMessage(askForClien);
+            await SendMessage(AskForClien);
             bool canCreate = false;
             var people = await FindChatsPeople();
             var invitedPeople = new List<string>();
@@ -123,18 +113,18 @@ namespace Messenger
                             invitedPeople.Add(nick);
                             canCreate = true;
                             await SendMessage($"Ok, person was invited{Environment.NewLine}" +
-                                $"{askForClien}");
+                                $"{AskForClien}");
                         }
                         else
                         {
                             await SendMessage($"You invited this person{Environment.NewLine}{Environment.NewLine}" +
-                                $"{askForClien}");
+                                $"{AskForClien}");
                         }
                     }
                     else
                     {
                         await SendMessage($"Don`t have this nickname{Environment.NewLine}{Environment.NewLine}" +
-                            $"{askForClien}");
+                            $"{AskForClien}");
                     }
                 }
             }
@@ -166,15 +156,15 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pg":
-                    pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
+                    pathGroup = Path.Combine(messenger.Server.PublicGroupPath, nameGroup);
                     break;
                 default: //(sg)
-                    pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
+                    pathGroup = Path.Combine(messenger.Server.SecretGroupPath, nameGroup);
                     break;
             }
             fileMaster.CreateDirectory(pathGroup);
-            await fileMaster.UpdateFile($"{pathGroup}\\users.json", fileMaster.AddData(user.Nickname));
-            await fileMaster.UpdateFile($"{pathGroup}\\invitation.json", fileMaster.AddSomeData(invitedPeople));
+            await fileMaster.UpdateFile(Path.Combine(pathGroup, "users.json"), fileMaster.AddData(user.Nickname));
+            await fileMaster.UpdateFile(Path.Combine(pathGroup, "invitation.json"), fileMaster.AddSomeData(invitedPeople));
             return pathGroup;
         }
         private async Task InvitePeople(IEnumerable<string> invitedPeople, string nameGroup, string typeGroup)
@@ -182,15 +172,15 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pg":
-                    await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, "my group");
+                    await ReadWriteInvitationOrGroup(Path.Combine(messenger.Server.UsersPath, user.Nickname, "userGroups.json"), nameGroup, "my group");
                     break;
                 default: //(sg)
-                    await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{user.Nickname}\secretGroups.json", nameGroup, "my group");
+                    await ReadWriteInvitationOrGroup(Path.Combine(messenger.Server.UsersPath, user.Nickname, "secretGroups.json"), nameGroup, "my group");
                     break;
             }
             foreach (var invitedPerson in invitedPeople)
             {
-                await ReadWriteInvitationOrGroup($@"D:\temp\messenger\Users\{invitedPerson}\invitation.json", nameGroup, typeGroup); //////////////////// check if somebode delete your nick?
+                await ReadWriteInvitationOrGroup(Path.Combine(messenger.Server.UsersPath, invitedPerson, "invitation.json"), nameGroup, typeGroup); //////////////////// check if somebode delete your nick?
             }
         }
         private async Task ReadWriteInvitationOrGroup(string path, string nameGroup, string typeGroup)
@@ -230,7 +220,7 @@ namespace Messenger
         }
         private async Task<List<string>> FindChatsPeople()
         {
-            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>($@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Where(nickname => nickname != user.Nickname)

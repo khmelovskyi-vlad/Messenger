@@ -11,10 +11,11 @@ namespace Messenger
 {
     class FileMaster
     {
-        public FileMaster()
+        public FileMaster(string usersPath)
         {
-
+            this.UsersPath = usersPath;
         }
+        private string UsersPath { get; }
 
 
         public void DeleterFolder(string path)
@@ -35,7 +36,7 @@ namespace Messenger
         }
         public string[] ReadUsersPaths()
         {
-            return Directory.GetFiles(@"D:\temp\messenger\Users");
+            return Directory.GetFiles(UsersPath);
         }
         public async Task<List<T>> ReadAndDeserialize<T>(string path)
         {

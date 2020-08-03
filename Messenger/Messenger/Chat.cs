@@ -14,23 +14,26 @@ namespace Messenger
 {
     class Chat
     {
-        public Chat(string typtChat, string nameChat, string pathChat)
+        public Chat(string typtChat, string nameChat, string pathChat, Messenger messenger, FileMaster fileMaster)
         {
             this.TypeChat = typtChat;
             this.NameChat = nameChat;
             this.PathChat = pathChat;
+            this.messenger = messenger;
+            this.fileMaster = fileMaster;
         }
         public string NameChat { get; set; }
+        private string TypeChat { get; set; }
+        private string PathChat { get; set; }
+        private Messenger messenger;
         private object usersOnlineLock = new object();
         public List<User> UsersOnline = new List<User>();
         private object usersOnlineToCheckLock = new object();
         public List<User> UsersOnlineToCheck = new List<User>();
-        private string TypeChat { get; set; }
         private List<string> messages;
         private object messagesLock = new object();
-        private string PathChat;
         private string message;
-        private FileMaster fileMaster = new FileMaster();
+        private FileMaster fileMaster;
 
         public async Task Run(User user, bool firstConnect)
         {
@@ -121,7 +124,7 @@ namespace Messenger
             await user.communication.SendMessageAndAnswerClient("You really want to leave a group? If yes write: 'yes'");
             if (user.communication.data.ToString() == "yes")
             {
-                GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, PathChat, TypeChat, NameChat, fileMaster);
+                GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath, fileMaster);
                 await groupsLeaver.Leave();
                 lock (usersOnlineToCheckLock)
                 {
@@ -245,8 +248,8 @@ namespace Messenger
                     partInvitation = "";
                     break;
             }
-            await fileMaster.UpdateFile($@"D:\temp\messenger\Users\{namePerson}\invitation.json", fileMaster.AddData($"{partInvitation}{NameChat}"));
-            await fileMaster.UpdateFile($@"{PathChat}\invitation.json", fileMaster.AddData(namePerson));
+            await fileMaster.UpdateFile(Path.Combine(messenger.Server.UsersPath, namePerson, "invitation.json"), fileMaster.AddData($"{partInvitation}{NameChat}"));
+            await fileMaster.UpdateFile(Path.Combine(PathChat, namePerson, "invitation.json"), fileMaster.AddData(namePerson));
         }
         private async Task WriteData(string path, string data)
         {
@@ -257,18 +260,18 @@ namespace Messenger
         }
         private async Task<bool> CheckPerson(string namePerson)
         {
-            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(@"D:\temp\messenger\nicknamesAndPasswords\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<UserNicknameAndPasswordAndIPs>(Path.Combine(messenger.Server.NicknamesAndPasswordsPath, "users.json")))
                 ?? new List<UserNicknameAndPasswordAndIPs>())
                 .Select(user => user.Nickname)
                 .Contains(namePerson);
         }
         private async Task<bool> CheckUserPresenceGroup(string namePerson, User user)
         {
-            if (!await CheckUsersLeavedPeopleInvitation($@"{PathChat}\leavedPeople.json"))
+            if (!await CheckUsersLeavedPeopleInvitation(Path.Combine(PathChat, "leavedPeople.json")))
             {
-                if (!await CheckUsersLeavedPeopleInvitation($@"{PathChat}\users.json"))
+                if (!await CheckUsersLeavedPeopleInvitation(Path.Combine(PathChat, "users.json")))
                 {
-                    if (!await CheckUsersLeavedPeopleInvitation($@"{PathChat}\invitation.json"))
+                    if (!await CheckUsersLeavedPeopleInvitation(Path.Combine(PathChat, "invitation.json")))
                     {
                         return false;
                     };
@@ -316,10 +319,10 @@ namespace Messenger
             switch (typeNewGroup)
             {
                 case "public":
-                    pathNewGroup = @"D:\temp\messenger\publicGroup";
+                    pathNewGroup = messenger.Server.PublicGroupPath;
                     break;
                 case "secret":
-                    pathNewGroup = @"D:\temp\messenger\secretGroup";
+                    pathNewGroup = messenger.Server.SecretGroupPath;
                     break;
                 default:
                     await AddUser(user);
@@ -334,12 +337,12 @@ namespace Messenger
                 {
                     KickPeople(user);
                     var groupUser = await FindAnotherUser(user);
-                    var userPath = $@"D:\temp\messenger\Users\{groupUser}";
-                    var usersPaths = new string[] { $@"D:\temp\messenger\Users\{user.Nickname}", userPath };
+                    var userPath = Path.Combine(messenger.Server.UsersPath, groupUser);
+                    var usersPaths = new string[] { Path.Combine(messenger.Server.UsersPath, user.Nickname), userPath };
                     await AddUserToGroups(usersPaths[0], nameNewGroup, typeNewGroup, user);
                     await DeletePeopleChatsBeen(usersPaths);
                     await AddInvitations(userPath, nameNewGroup, typeNewGroup, groupUser);
-                    var newPath = $"{pathNewGroup}\\{nameNewGroup}";
+                    var newPath = Path.Combine(pathNewGroup, nameNewGroup);
                     Directory.Move(PathChat, newPath);
                     PathChat = newPath;
                     NameChat = nameNewGroup;
@@ -353,8 +356,8 @@ namespace Messenger
         }
         private async Task AddInvitations(string userPath, string nameGroup, string typeGroup, string userGroup)
         {
-            await AddInvitation($"{userPath}\\invitation.json", $"{typeGroup}: {nameGroup}");
-            await AddInvitation($"{PathChat}\\invitation.json", userGroup);
+            await AddInvitation(Path.Combine(userPath, "invitation.json"), $"{typeGroup}: {nameGroup}");
+            await AddInvitation(Path.Combine(PathChat, "invitation.json"), userGroup);
         }
         private async Task AddInvitation(string path, string data)
         {
@@ -374,15 +377,15 @@ namespace Messenger
                 default:
                     return;
             }
-            await fileMaster.UpdateFile($"{userPath}\\{partPath}", fileMaster.AddData(nameGroup));
-            await fileMaster.UpdateFile<string>($"{PathChat}\\users.json", users =>
+            await fileMaster.UpdateFile(Path.Combine(userPath, partPath), fileMaster.AddData(nameGroup));
+            await fileMaster.UpdateFile<string>(Path.Combine(PathChat, "users.json"), users =>
             {
                 return (new List<string>() { user.Nickname }, true);
             });
         }
         private async Task<string> FindAnotherUser(User user)
         {
-            return (await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\users.json"))
+            return (await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
                 .Where(x => x != user.Nickname)
                 .FirstOrDefault();
         }
@@ -390,7 +393,7 @@ namespace Messenger
         {
             foreach (var userPath in usersPath)
             {
-                await fileMaster.UpdateFile<PersonChat>($"{userPath}\\peopleChatsBeen.json", groups =>
+                await fileMaster.UpdateFile<PersonChat>(Path.Combine(userPath, "peopleChatsBeen.json"), groups =>
                 {
                     return (groups.Where(group => group.NameChat != NameChat).ToList(), true);
                 });
@@ -398,29 +401,27 @@ namespace Messenger
         }
         private async Task<bool> CheckGroups(string nameGroup, string path, User user)
         {
-            foreach (var symbol in nameGroup)
+            var goodInput = CharacterCheckers.CheckInput(nameGroup);
+            if (goodInput)
             {
-                if (symbol == '\\' || symbol == '/' || symbol == ':' || symbol == '*' || symbol == '?'
-                        || symbol == '"' || symbol == '<' || symbol == '>' || symbol == '|')
+                var groupsPath = Directory.GetDirectories(path);
+                foreach (var groupPath in groupsPath)
                 {
-                    var invertedComma = '"';
-                    await user.communication.SendMessage($"Group name can not contain characters such as:{Environment.NewLine}" +
-                        $"' ', '\\', '/', ':', '*', '?', '{invertedComma}', '<', '>', '|'{Environment.NewLine}" +
-                        $"Enter new, please");
-                    return false;
+                    var group = Path.GetFileName(groupPath);
+                    if (group == nameGroup)
+                    {
+                        await user.communication.SendMessage($"Have this group name, enter new, please");
+                        return false;
+                    }
                 }
+                return true;
             }
-            var groupsPath = Directory.GetDirectories(path);
-            foreach (var groupPath in groupsPath)
+            else
             {
-                var group = Path.GetFileName(groupPath);
-                if (group == nameGroup)
-                {
-                    await user.communication.SendMessage($"Have this group name, enter new, please");
-                    return false;
-                }
+                await user.communication.SendMessage($"The group name can only contain lowercase letters and numbers,{Environment.NewLine}" +
+                    $"Enter new, please");
+                return false;
             }
-            return true;
         }
         private async Task SendFile(User user)
         {
@@ -503,7 +504,7 @@ namespace Messenger
                 }
                 normalTime.Append(timeChar);
             }
-            var filePath = $@"{PathChat}\\{normalTime}{nameFile}";
+            var filePath = Path.Combine(PathChat, $"{normalTime}{nameFile}");
             var sw = new Stopwatch();
             sw.Start();
             await user.communication.ReceiveFile5(filePath);
@@ -526,7 +527,7 @@ namespace Messenger
                     return;
                 }
                 KickPerson(nickname);
-                GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, PathChat, TypeChat, NameChat, fileMaster);
+                GroupsLeaver groupsLeaver = new GroupsLeaver(nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath, fileMaster);
                 await groupsLeaver.Leave();
                 await SendMessageAndAddUser("User was deleted", user);
             }
@@ -564,7 +565,7 @@ namespace Messenger
         }
         private async Task<bool> CheckHavingNick(string nickname)
         {
-            return ((await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\users.json"))
+            return ((await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "users.json")))
                 ?? new List<string>())
                 .Contains(nickname);
         }
@@ -606,11 +607,11 @@ namespace Messenger
         }
         private async Task SaveMessage(string message)
         {
-            await fileMaster.UpdateFile($"{PathChat}\\data.json", fileMaster.AddData(message));
+            await fileMaster.UpdateFile(Path.Combine(PathChat, "data.json"), fileMaster.AddData(message));
         }
         private async Task FirstRead()
         {
-            this.messages = await fileMaster.ReadAndDeserialize<string>($"{PathChat}\\data.json") ?? new List<string>();
+            this.messages = await fileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "data.json")) ?? new List<string>();
         }
 
 

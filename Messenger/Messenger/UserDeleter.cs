@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -8,35 +9,32 @@ namespace Messenger
 {
     class UserDeleter
     {
-
-        private const string PublicGroupsPath = @"D:\temp\messenger\publicGroup";
-        private const string SecretGroupsPath = @"D:\temp\messenger\secretGroup";
-        private const string PeopleChatsPath = @"D:\temp\messenger\peopleChats";
-        private const string UsersPath = @"D:\temp\messenger\Users";
-        public UserDeleter(FileMaster fileMaster)
+        public UserDeleter(FileMaster fileMaster, Messenger messenger)
         {
             this.fileMaster = fileMaster;
+            this.messenger = messenger;
         }
+        private Messenger messenger;
         private FileMaster fileMaster;
         private string userNickname;
         public async Task Run(string nick, bool needChangeMessages)
         {
             userNickname = nick;
-            await DeleteData(PublicGroupsPath,
-                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\userGroups.json"),
-                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\leavedUserGroups.json"),
+            await DeleteData(messenger.Server.PublicGroupPath,
+                await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.UsersPath, userNickname, "userGroups.json")),
+                await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.UsersPath, userNickname, "leavedUserGroups.json")),
                 "ug",
                 needChangeMessages);
 
-            await DeleteData(SecretGroupsPath,
-                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\secretGroups.json"),
-                await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\leavedSecretGroups.json"),
+            await DeleteData(messenger.Server.SecretGroupPath,
+                await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.UsersPath, userNickname, "secretGroups.json")),
+                await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.UsersPath, userNickname, "leavedSecretGroups.json")),
                 "sg",
                 needChangeMessages);
-            await DeleteData(PeopleChatsPath,
-                ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{UsersPath}\{userNickname}\peopleChatsBeen.json"))
+            await DeleteData(messenger.Server.PeopleChatsPath,
+                ((await fileMaster.ReadAndDeserialize<PersonChat>(Path.Combine(messenger.Server.UsersPath, userNickname, "peopleChatsBeen.json")))
                 ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
-                ((await fileMaster.ReadAndDeserialize<PersonChat>($@"{UsersPath}\{userNickname}\leavedPeopleChatsBeen.json"))
+                ((await fileMaster.ReadAndDeserialize<PersonChat>(Path.Combine(messenger.Server.UsersPath, userNickname, "leavedPeopleChatsBeen.json")))
                 ?? new List<PersonChat>()).Select(chat => chat.NameChat).ToList(),
                 "pp",
                 needChangeMessages);
@@ -58,7 +56,7 @@ namespace Messenger
             {
                 foreach (var groupName in groupNames)
                 {
-                    var path = $"{firstPartOfThePast}\\{groupName}\\{lastPartOfThePast}";
+                    var path = Path.Combine(firstPartOfThePast, groupName, lastPartOfThePast);
                     var needDeleteGroup = false;
                     await fileMaster.UpdateFile<string>(path, (users) =>
                     {
@@ -74,7 +72,11 @@ namespace Messenger
                     });
                     if (needDeleteGroup)
                     {
-                        GroupDeleter groupDeleter = new GroupDeleter(groupName, $"{firstPartOfThePast}\\{groupName}", typeGroups, fileMaster);
+                        GroupDeleter groupDeleter = new GroupDeleter(groupName, 
+                            Path.Combine(firstPartOfThePast, groupName), 
+                            typeGroups, 
+                            messenger.Server.UsersPath, 
+                            fileMaster);
                         await groupDeleter.Run();
                     }
                 }
@@ -90,7 +92,7 @@ namespace Messenger
         {
             if (groups != null)
             {
-                var groupsPaths = groups.Select(nameGroup => $@"{path}\{nameGroup}\data.json");
+                var groupsPaths = groups.Select(nameGroup => Path.Combine(path, nameGroup, "data.json"));
                 foreach (var groupPaths in groupsPaths)
                 {
                     await ReadWriteData(groupPaths);
@@ -112,7 +114,7 @@ namespace Messenger
         }
         private async Task DeleteInvitations()
         {
-            var invitations = await fileMaster.ReadAndDeserialize<string>($@"{UsersPath}\{userNickname}\invitation.json");
+            var invitations = await fileMaster.ReadAndDeserialize<string>(Path.Combine(messenger.Server.UsersPath, userNickname, "invitation.json"));
             if (invitations != null)
             {
                 foreach (var invitation in invitations)
@@ -121,10 +123,10 @@ namespace Messenger
                     switch (invitation[0])
                     {
                         case 'p':
-                            path = $@"{PublicGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+                            path = Path.Combine(messenger.Server.PublicGroupPath, invitation.Remove(0, 8), "invitation.json");
                             break;
                         case 's':
-                            path = $@"{SecretGroupsPath}\{invitation.Remove(0, 8)}\invitation.json";
+                            path = Path.Combine(messenger.Server.SecretGroupPath, invitation.Remove(0, 8), "invitation.json");
                             break;
                         default:
                             path = "";

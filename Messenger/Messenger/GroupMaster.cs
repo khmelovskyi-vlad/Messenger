@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 //using System.IO;
 using System.Linq;
 using System.Net.Sockets;
@@ -11,20 +12,19 @@ namespace Messenger
 {
     class GroupMaster
     {
-        public GroupMaster(User user)
+        public GroupMaster(User user, Messenger messenger, FileMaster fileMaster)
         {
             this.user = user;
+            this.messenger = messenger;
+            this.fileMaster = fileMaster;
         }
         private User user;
-        private string UserFoldersPath { get { return @"D:\temp\messenger\Users"; } }
-        private string PublicGroupsPath { get { return @"D:\temp\messenger\publicGroup"; } }
-        private string SecreatGroupsPath { get { return @"D:\temp\messenger\secretGroup"; } }
-        private string PeopleChatsPath { get { return @"D:\temp\messenger\peopleChats"; } }
-        private FileMaster fileMaster = new FileMaster();
+        private Messenger messenger;
+        private FileMaster fileMaster;
         private UserChats userChats;
         public async Task<GroupInformation> Run()
         {
-            userChats = new UserChats(fileMaster, user.Nickname, UserFoldersPath, PublicGroupsPath, SecreatGroupsPath, PeopleChatsPath);
+            userChats = new UserChats(fileMaster, user.Nickname, messenger);
             await userChats.FindAllChats();
             await SendChats(false);
             return await ModeSelection();
@@ -116,7 +116,7 @@ namespace Messenger
                 {
                     return new GroupInformation(true, typeGroup,
                         personChat.NameChat,
-                        $@"D:\temp\messenger\peopleChats\{personChat.NameChat}");
+                        Path.Combine(messenger.Server.PeopleChatsPath, personChat.NameChat));
                 }
             }
             return new GroupInformation { CanOpenChat = false};
@@ -125,12 +125,12 @@ namespace Messenger
         {
             var nameChat = $"{namePerson} {user.Nickname}";
             PersonChat personChat = new PersonChat(new string[] { namePerson, user.Nickname }, nameChat);
-            WriteNewPerson($@"D:\temp\messenger\Users\{user.Nickname}\peopleChatsBeen.json", personChat);
-            WriteNewPerson($@"D:\temp\messenger\Users\{namePerson}\peopleChatsBeen.json", personChat);
-            var path = $@"D:\temp\messenger\peopleChats\{nameChat}";
+            WriteNewPerson(Path.Combine(messenger.Server.UsersPath, user.Nickname, "peopleChatsBeen.json"), personChat);
+            WriteNewPerson(Path.Combine(messenger.Server.UsersPath, namePerson, "peopleChatsBeen.json"), personChat);
+            var path = Path.Combine(messenger.Server.PeopleChatsPath, nameChat);
             fileMaster.CreateDirectory(path);
-            await AddData($"{path}\\users.json", user.Nickname);
-            await AddData($"{path}\\users.json", namePerson);
+            await AddData(Path.Combine(path, "users.json"), user.Nickname);
+            await AddData(Path.Combine(path, "users.json"), namePerson);
             return new GroupInformation(true, typeGroup, nameChat, path);
         }
         private async void WriteNewPerson(string path, PersonChat personChat)
@@ -140,7 +140,7 @@ namespace Messenger
         private async Task<GroupInformation> CheckChatAndCreatePath(string nameGroup, string typeGroup)
         {
             List<string> groups = new List<string>();
-            string pathGroup = $"{PublicGroupsPath}\\{nameGroup}";
+            string pathGroup = Path.Combine(messenger.Server.PublicGroupPath, nameGroup);
             var needCreatePP = false;
             var needCorect = false;
             var needAddUser = false;
@@ -156,7 +156,7 @@ namespace Messenger
                     break;
                 case "sg":
                     groups = await userChats.FindSecretGroups();
-                    pathGroup = $"{SecreatGroupsPath}\\{nameGroup}";
+                    pathGroup = Path.Combine(messenger.Server.SecretGroupPath, nameGroup);
                     break;
                 case "ug":
                     groups = await userChats.FindUserGroups();
@@ -182,7 +182,7 @@ namespace Messenger
                         }
                         else if (needAddUser)
                         {
-                            await AddGroup($@"D:\temp\messenger\Users\{user.Nickname}\userGroups.json", nameGroup, pathGroup);
+                            await AddGroup(Path.Combine(messenger.Server.UsersPath, user.Nickname, "userGroups.json"), nameGroup, pathGroup);
                         }
                         return new GroupInformation(true, typeGroup, nameGroup, pathGroup);
                     }
@@ -204,11 +204,11 @@ namespace Messenger
         private async Task AddGroup(string path, string nameGroup, string pathGroup)
         {
             await AddData(path, nameGroup);
-            if (await CheckDeleteInvitation($@"D:\temp\messenger\Users\{user.Nickname}\invitation.json", $"public: {nameGroup}"))
+            if (await CheckDeleteInvitation(Path.Combine(messenger.Server.UsersPath, user.Nickname, "invitation.json"), $"public: {nameGroup}"))
             {
-                await CheckDeleteInvitation($@"{pathGroup}\invitation.json", user.Nickname);
+                await CheckDeleteInvitation(Path.Combine(pathGroup, "invitation.json"), user.Nickname);
             }
-            await AddData($"{pathGroup}\\users.json", user.Nickname);
+            await AddData(Path.Combine(pathGroup, "users.json"), user.Nickname);
         }
         private async Task AddData(string path, string data)
         {
@@ -291,19 +291,19 @@ namespace Messenger
             {
                 case 'p':
                     typeGroup = "pg";
-                    pathGroup = $@"{PublicGroupsPath}\{nameGroup}";
-                    pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\userGroups.json";
+                    pathGroup = Path.Combine(messenger.Server.PublicGroupPath, nameGroup);
+                    pathUser = Path.Combine(messenger.Server.UsersPath, user.Nickname, "userGroups.json");
                     break;
                 default: //(sg)
                     typeGroup = "sg";
-                    pathGroup = $@"{SecreatGroupsPath}\{nameGroup}";
-                    pathUser = $@"D:\temp\messenger\Users\{user.Nickname}\\secretGroups.json";
+                    pathGroup = Path.Combine(messenger.Server.SecretGroupPath, nameGroup);
+                    pathUser = Path.Combine(messenger.Server.UsersPath, user.Nickname, "secretGroups.json");
                     break;
             }
-            await AddUserOrGroup($"{pathGroup}\\users.json", user.Nickname);
+            await AddUserOrGroup(Path.Combine(pathGroup, "users.json"), user.Nickname);
             await AddUserOrGroup(pathUser, nameGroup);
-            await DeleteInvitation($@"D:\temp\messenger\Users\{user.Nickname}\invitation.json", invitation);
-            await DeleteInvitation($@"{pathGroup}\invitation.json", user.Nickname);
+            await DeleteInvitation(Path.Combine(messenger.Server.UsersPath, user.Nickname, "invitation.json"), invitation);
+            await DeleteInvitation(Path.Combine(pathGroup, "invitation.json"), user.Nickname);
             return new GroupInformation(true, typeGroup, nameGroup, pathGroup);
         }
         private async Task AddUserOrGroup(string path, string information)
@@ -355,7 +355,7 @@ namespace Messenger
         }
         private async Task<GroupInformation> CreateNewGroup()
         {
-            CreatorGroups creatorGroups = new CreatorGroups(user);
+            GroupCreator creatorGroups = new GroupCreator(user, messenger, fileMaster);
             return await creatorGroups.Run();
         }
         private async Task HelpFindChat(string message)

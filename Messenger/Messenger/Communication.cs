@@ -11,11 +11,11 @@ namespace Messenger
 {
     class Communication
     {
-        public Communication(Socket listener)
+        public Communication(Socket socket)
         {
-            this.listener = listener;
+            this.socket = socket;
         }
-        private Socket listener;
+        private Socket socket;
         public StringBuilder data;
         public bool EndTask = false;
         private byte[] buffer;
@@ -49,10 +49,10 @@ namespace Messenger
             data = new StringBuilder();
             do
             {
-                var received = await Task.Factory.FromAsync(listener.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), listener.EndReceive);
+                var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), socket.EndReceive);
                 data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-            } while (listener.Available > 0);
-            await CheckEndTask(listener);
+            } while (socket.Available > 0);
+            await CheckEndTask(socket);
         }
         private async Task CheckEndTask(Socket listener)
         {
@@ -125,14 +125,14 @@ namespace Messenger
         public async Task SendMessage(string message)
         {
             byte[] byteData = Encoding.ASCII.GetBytes(message);
-            await Task.Factory.FromAsync(listener.BeginSend(byteData, 0, byteData.Length, SocketFlags.None, null, null), listener.EndSend);
+            await Task.Factory.FromAsync(socket.BeginSend(byteData, 0, byteData.Length, SocketFlags.None, null, null), socket.EndSend);
             //await Task.Factory.FromAsync(listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallbackk, listener), listener.EndSend);
         }
         public void SendFile(string fileName)
         {
             var length = new FileInfo(fileName).Length;
             var lengthByte = BitConverter.GetBytes(length);
-            listener.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, SendFileCallback, listener);
+            socket.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, SendFileCallback, socket);
             resetSend.WaitOne();
         }
         public async Task SendFile2(string fileName)
@@ -140,8 +140,8 @@ namespace Messenger
             var length = new FileInfo(fileName).Length;
             var lengthByte = BitConverter.GetBytes(length);
             await Task.Factory.FromAsync(
-                listener.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, null, null),
-                listener.EndSendFile);
+                socket.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, null, null),
+                socket.EndSendFile);
         }
         private void SendFileCallback(IAsyncResult AR)
         {
@@ -160,15 +160,15 @@ namespace Messenger
         {
             var byteCount = 8;
             var bufferFileLength = new byte[byteCount];
-            await Task.Factory.FromAsync(listener.BeginReceive(bufferFileLength, 0, byteCount, SocketFlags.None, null, null), listener.EndReceive);
+            await Task.Factory.FromAsync(socket.BeginReceive(bufferFileLength, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
             var fileLength = BitConverter.ToInt64(bufferFileLength, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
                 do
                 {
-                    var received = await Task.Factory.FromAsync(listener.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), 
-                        listener.EndReceive);
+                    var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), 
+                        socket.EndReceive);
                     await stream.WriteAsync(buffer, 0, received);
                 } while (stream.Length != fileLength);
             }
@@ -176,7 +176,7 @@ namespace Messenger
         public async Task ReceiveFile(string path)
         {
             buffer = new byte[8];
-            listener.BeginReceive(buffer, 0, 8, SocketFlags.None, ReceiveFileCallback, listener);
+            socket.BeginReceive(buffer, 0, 8, SocketFlags.None, ReceiveFileCallback, socket);
             resetReceive.WaitOne();
             var fileLength = BitConverter.ToInt64(buffer, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
@@ -184,7 +184,7 @@ namespace Messenger
                 buffer = new byte[size];
                 do
                 {
-                    listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallback, listener);
+                    socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallback, socket);
                     resetReceive.WaitOne();
                     await stream.WriteAsync(buffer, 0, countReceivedBytes);
                 } while (stream.Length != fileLength);
@@ -193,7 +193,7 @@ namespace Messenger
         public async Task ReceiveFile2(string path)
         {
             buffer = new byte[8];
-            var bufferSize = listener.Receive(buffer);
+            var bufferSize = socket.Receive(buffer);
             var fileLength = BitConverter.ToInt64(buffer, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
@@ -201,7 +201,7 @@ namespace Messenger
                 var endSend = 0;
                 do
                 {
-                    bufferSize = listener.Receive(buffer);
+                    bufferSize = socket.Receive(buffer);
                     endSend = endSend + bufferSize;
                     await stream.WriteAsync(buffer, 0, bufferSize);
                 } while (endSend != fileLength);
@@ -226,14 +226,14 @@ namespace Messenger
         public void ReceiveFile3(string path)
         {
             buffer = new byte[8];
-            var bufferSize = listener.Receive(buffer);
+            var bufferSize = socket.Receive(buffer);
             var fileLength = BitConverter.ToInt64(buffer, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
                 do
                 {
-                    bufferSize = listener.Receive(buffer);
+                    bufferSize = socket.Receive(buffer);
                     stream.Write(buffer, 0, bufferSize);
                 } while (stream.Length != fileLength);
             }
@@ -241,13 +241,13 @@ namespace Messenger
         public void ReceiveFile4(string path)
         {
             buffer = new byte[8];
-            var bufferSize = listener.Receive(buffer);
+            var bufferSize = socket.Receive(buffer);
             var fileLength = BitConverter.ToInt64(buffer, 0);
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
-                StateObject stateObject = new StateObject { socket = listener, stream = stream, fileLength = fileLength };
-                listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
+                StateObject stateObject = new StateObject { socket = socket, stream = stream, fileLength = fileLength };
+                socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
                 resetReceive.WaitOne();
             }
         }

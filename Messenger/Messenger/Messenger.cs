@@ -12,11 +12,13 @@ namespace Messenger
 {
     class Messenger
     {
-        public Messenger(string mainDirectoryPath)
+        public Messenger(Server server, FileMaster fileMaster)
         {
-            this.mainDirectoryPath = mainDirectoryPath;
+            this.Server = server;
+            this.fileMaster = fileMaster;
         }
-        private string mainDirectoryPath { get; }
+        public Server Server;
+        private FileMaster fileMaster;
         public List<User> online = new List<User>();
         public object OnlineLock = new object();
         private List<Chat> chats = new List<Chat>(); //needChatLock
@@ -25,7 +27,7 @@ namespace Messenger
             var result = false;
             try
             {
-                Connector connector = new Connector(socket, this, mainDirectoryPath);
+                Connector connector = new Connector(socket, this, fileMaster);
                 var nickname = await connector.Run();
                 if (nickname == "?Disconnect")
                 {
@@ -33,7 +35,7 @@ namespace Messenger
                 }
                 if (nickname.Length != 0)
                 {
-                    var isOnline = CheckOnline(nickname, socket);
+                    var isOnline = CheckOnline(nickname);
                     if (isOnline)
                     {
                         return false;
@@ -75,7 +77,7 @@ namespace Messenger
             {
                 while (true)
                 {
-                    GroupMaster groupMaster = new GroupMaster(user);
+                    GroupMaster groupMaster = new GroupMaster(user, this, fileMaster);
                     var groupInformation = await groupMaster.Run();
                     if (groupInformation.CanOpenChat)
                     {
@@ -118,7 +120,7 @@ namespace Messenger
             await user.communication.AnswerClient();
             return result;
         }
-        private bool CheckOnline(string nickname, Socket listener)
+        private bool CheckOnline(string nickname)
         {
             lock (OnlineLock)
             {
@@ -147,7 +149,7 @@ namespace Messenger
             }
             if (!findChat)
             {
-                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path);
+                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path, this, fileMaster);
                 chats.Add(chat);
                 await chat.Run(user, true);
                 CheckOnline(chat);
@@ -163,9 +165,9 @@ namespace Messenger
                 }
             }
         }
-        private User CreateUser(Socket listener, string nick)
+        private User CreateUser(Socket socket, string nick)
         {
-            return new User(listener, nick);
+            return new User(socket, nick);
         }
     }
 }

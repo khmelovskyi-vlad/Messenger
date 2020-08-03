@@ -1,6 +1,7 @@
 ﻿using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -9,19 +10,21 @@ namespace Messenger
 {
     class GroupsLeaver
     {
-        public GroupsLeaver(string userNick, string pathChat, string typeChat, string nameChat, FileMaster fileMaster)
+        public GroupsLeaver(string userNick, string nameGroup, string pathGroup, string typeGroup, string usersPath, FileMaster fileMaster)
         {
-            this.NameChat = nameChat;
-            this.userNick = userNick;
-            this.pathChat = pathChat;
-            this.typeChat = typeChat;
+            this.NameGroup = nameGroup;
+            this.UserNick = userNick;
+            this.PathGroup = pathGroup;
+            this.TypeGroup = typeGroup;
+            this.UsersPath = usersPath;
             this.fileMaster = fileMaster;
             needChat = new PersonChat();
         }
-        private string NameChat { get; }
-        private string userNick;
-        private string pathChat;
-        private string typeChat;
+        private string NameGroup { get; }
+        private string UserNick { get; }
+        private string PathGroup { get; }
+        private string TypeGroup { get; }
+        private string UsersPath { get; }
         private FileMaster fileMaster;
         private PersonChat needChat;
         public async Task<bool> Leave()
@@ -35,26 +38,26 @@ namespace Messenger
         }
         private string[] FindPathsElement()
         {
-            if (typeChat == "pg" || typeChat == "ug")
+            if (TypeGroup == "pg" || TypeGroup == "ug")
             {
-                return new string[] { "userGroups", "leavedUserGroups"};
+                return new string[] { "userGroups.json", "leavedUserGroups.json" };
             }
-            else if (typeChat == "sg")
+            else if (TypeGroup == "sg")
             {
-                return new string[] { "secretGroups", "leavedSecretGroups" };
+                return new string[] { "secretGroups.json", "leavedSecretGroups.json" };
             }
-            else if (typeChat == "pp" || typeChat == "ch")
+            else if (TypeGroup == "pp" || TypeGroup == "ch")
             {
-                return new string[] { "peopleChatsBeen", "leavedPeopleChatsBeen" };
+                return new string[] { "peopleChatsBeen.json", "leavedPeopleChatsBeen.json" };
             }
             return new string[0];
         }
         private async Task<bool> DeleteData(string[] pathsElement)
         {
             var needDeleteGroup = false;
-            await fileMaster.UpdateFile<string>($"{pathChat}\\users.json", users =>
+            await fileMaster.UpdateFile<string>(Path.Combine(PathGroup, "users.json"), users =>
             {
-                users.Remove(userNick);
+                users.Remove(UserNick);
                 if (users.Count == 0)
                 {
                     needDeleteGroup = true;
@@ -67,16 +70,16 @@ namespace Messenger
                 await DeleteGroup();
             }
 
-            if (pathsElement[0] == "peopleChatsBeen")
+            if (pathsElement[0] == "peopleChatsBeen.json")
             {
                 await DeletePeopleChatsBeen(pathsElement[0]);
             }
             else
             {
-                await fileMaster.UpdateFile<string>($@"D:\temp\messenger\Users\{userNick}\{pathsElement[0]}.json", nameChats =>
+                await fileMaster.UpdateFile<string>(Path.Combine(UsersPath, UserNick, pathsElement[0]), nameChats =>
                 {
                     return ((nameChats ?? new List<string>())
-                    .Where(chat => chat != NameChat)
+                    .Where(group => group != NameGroup)
                     .ToList(), true);
                 });
             }
@@ -84,13 +87,13 @@ namespace Messenger
         }
         private async Task DeletePeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.UpdateFile<PersonChat>($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", nameChats =>
+            await fileMaster.UpdateFile<PersonChat>(Path.Combine(UsersPath, UserNick, pathsElement), nameChats =>
             {
                 if (nameChats != null)
                 {
                     foreach (var nameChat in nameChats)
                     {
-                        if (nameChat.NameChat == NameChat)
+                        if (nameChat.NameChat == NameGroup)
                         {
                             needChat = nameChat;
                             break;
@@ -107,23 +110,23 @@ namespace Messenger
         }
         private async Task AddData(string[] pathsElement)
         {
-            await fileMaster.UpdateFile($"{pathChat}\\leavedPeople.json", fileMaster.AddData(userNick));
-            if (pathsElement[0] == "peopleChatsBeen")
+            await fileMaster.UpdateFile(Path.Combine(PathGroup, "leavedPeople.json"), fileMaster.AddData(UserNick));
+            if (pathsElement[0] == "peopleChatsBeen.json")
             {
-                await AddPeopleChatsBeen("leavedPeopleChatsBeen");
+                await AddPeopleChatsBeen(pathsElement[1]);
             }
             else
             {
-                await fileMaster.UpdateFile($@"D:\temp\messenger\Users\{userNick}\{pathsElement[1]}.json", fileMaster.AddData(NameChat));
+                await fileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement[1]), fileMaster.AddData(NameGroup));
             }
         }
         private async Task AddPeopleChatsBeen(string pathsElement)
         {
-            await fileMaster.UpdateFile($@"D:\temp\messenger\Users\{userNick}\{pathsElement}.json", fileMaster.AddData(needChat));
+            await fileMaster.UpdateFile(Path.Combine(UsersPath, UserNick, pathsElement), fileMaster.AddData(needChat));
         }
         private async Task DeleteGroup()
         {
-            GroupDeleter groupDeleter = new GroupDeleter(NameChat, pathChat, typeChat, fileMaster);
+            GroupDeleter groupDeleter = new GroupDeleter(NameGroup, PathGroup, TypeGroup, UsersPath, fileMaster);
             await groupDeleter.Run();
         }
     }

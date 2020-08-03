@@ -62,12 +62,13 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="CharacterCheckers.cs" />
     <Compile Include="GroupInformation.cs" />
     <Compile Include="UserChats.cs" />
-    <Compile Include="BanerUsers.cs" />
+    <Compile Include="CommandInterpreter.cs" />
     <Compile Include="Chat.cs" />
     <Compile Include="Connector.cs" />
-    <Compile Include="CreatorGroups.cs" />
+    <Compile Include="GroupCreator.cs" />
     <Compile Include="FileMaster.cs" />
     <Compile Include="GroupDeleter.cs" />
     <Compile Include="GroupMaster.cs" />
