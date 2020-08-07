@@ -27,8 +27,8 @@ namespace Messenger
         private Messenger messenger;
         private object usersOnlineLock = new object();
         public List<User> UsersOnline = new List<User>();
-        private object usersOnlineToCheckLock = new object();
-        public List<User> UsersOnlineToCheck = new List<User>();
+        private object usersOnlineInCheckModeLock = new object();
+        public List<User> UsersOnlineInCheckMode = new List<User>();
         private List<string> messages;
         private object messagesLock = new object();
         private string message;
@@ -59,9 +59,9 @@ namespace Messenger
                 {
                     UsersOnline.Remove(user);
                 }
-                lock (usersOnlineToCheckLock)
+                lock (usersOnlineInCheckModeLock)
                 {
-                    UsersOnlineToCheck.Remove(user);
+                    UsersOnlineInCheckMode.Remove(user);
                 }
                 throw ex;
             }
@@ -124,9 +124,9 @@ namespace Messenger
             {
                 GroupsLeaver groupsLeaver = new GroupsLeaver(user.Nickname, NameChat, PathChat, TypeChat, messenger.Server.UsersPath);
                 await groupsLeaver.Leave();
-                lock (usersOnlineToCheckLock)
+                lock (usersOnlineInCheckModeLock)
                 {
-                    UsersOnlineToCheck.Remove(user);
+                    UsersOnlineInCheckMode.Remove(user);
                 }
                 await user.communication.SendMessage("?/you left the chat");
                 return true;
@@ -143,9 +143,9 @@ namespace Messenger
             {
                 UsersOnline.Remove(user);
             }
-            lock (usersOnlineToCheckLock)
+            lock (usersOnlineInCheckModeLock)
             {
-                UsersOnlineToCheck.Add(user);
+                UsersOnlineInCheckMode.Add(user);
             }
         }
         private async Task AddUser(User user)
@@ -156,9 +156,9 @@ namespace Messenger
             {
                 UsersOnline.Add(user);
             }
-            lock (usersOnlineToCheckLock)
+            lock (usersOnlineInCheckModeLock)
             {
-                UsersOnlineToCheck.Remove(user);
+                UsersOnlineInCheckMode.Remove(user);
             }
         }
         private void KickPeople(User user)
@@ -174,16 +174,16 @@ namespace Messenger
                 }
                 UsersOnline = new List<User>();
             }
-            lock (usersOnlineToCheckLock)
+            lock (usersOnlineInCheckModeLock)
             {
-                foreach (var userOnlineToCheck in UsersOnlineToCheck)
+                foreach (var userOnlineToCheck in UsersOnlineInCheckMode)
                 {
                     if (user.Nickname != userOnlineToCheck.Nickname)
                     {
                         userOnlineToCheck.communication.EndTask = true;
                     }
                 }
-                UsersOnlineToCheck = new List<User> { user };
+                UsersOnlineInCheckMode = new List<User> { user };
             }
         }
         private void CreateMainMessage()
@@ -248,13 +248,6 @@ namespace Messenger
             }
             await FileMaster.UpdateFile(Path.Combine(messenger.Server.UsersPath, namePerson, "invitation.json"), FileMaster.AddData($"{partInvitation}{NameChat}"));
             await FileMaster.UpdateFile(Path.Combine(PathChat, namePerson, "invitation.json"), FileMaster.AddData(namePerson));
-        }
-        private async Task WriteData(string path, string data)
-        {
-            using (var stream = new StreamWriter(path, false))
-            {
-                await stream.WriteAsync(data);
-            }
         }
         private async Task<bool> CheckPerson(string namePerson)
         {
@@ -548,9 +541,9 @@ namespace Messenger
                 }
                 UsersOnline = UsersOnline.Where(user => user.Nickname != nickname).ToList();
             }
-            lock (usersOnlineToCheckLock)
+            lock (usersOnlineInCheckModeLock)
             {
-                foreach (var userOnlineToCheck in UsersOnlineToCheck)
+                foreach (var userOnlineToCheck in UsersOnlineInCheckMode)
                 {
                     if (userOnlineToCheck.Nickname == nickname)
                     {
@@ -558,7 +551,7 @@ namespace Messenger
                         break;
                     }
                 }
-                UsersOnlineToCheck = UsersOnlineToCheck.Where(user => user.Nickname != nickname).ToList();
+                UsersOnlineInCheckMode = UsersOnlineInCheckMode.Where(user => user.Nickname != nickname).ToList();
             }
         }
         private async Task<bool> CheckHavingNick(string nickname)
@@ -590,9 +583,9 @@ namespace Messenger
                     await userOnline.communication.SendMessage(messageSend);
                 }
             //}
-            lock (usersOnlineToCheckLock)
+            lock (usersOnlineInCheckModeLock)
             {
-                foreach (var userOnlineToCheck in UsersOnlineToCheck)
+                foreach (var userOnlineToCheck in UsersOnlineInCheckMode)
                 {
                     userOnlineToCheck.UnReadMessages.Add(messageSend);
                 }
@@ -609,13 +602,8 @@ namespace Messenger
         }
         private async Task FirstRead()
         {
-            this.messages = await FileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "data.json")) ?? new List<string>();
+            messages = await FileMaster.ReadAndDeserialize<string>(Path.Combine(PathChat, "data.json")) ?? new List<string>();
         }
-
-
-
-
-        AutoResetEvent resetSend = new AutoResetEvent(false);
-        AutoResetEvent resetReceive = new AutoResetEvent(false);
+        
     }
 }

@@ -157,7 +157,7 @@ namespace Messenger
         {
             if (chat.UsersOnline.Count == 0)
             {
-                if (chat.UsersOnlineToCheck.Count == 0)
+                if (chat.UsersOnlineInCheckMode.Count == 0)
                 {
                     chats.Remove(chat);
                 }
