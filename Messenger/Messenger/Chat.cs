@@ -443,7 +443,7 @@ namespace Messenger
                 if (needFilesPaths.Count == 1 || findNeedFile)
                 {
                     await user.communication.SendMessageAndAnswerClient("Finded");
-                    await user.communication.SendFile2(needFilesPaths[0]);
+                    await user.communication.SendFile(needFilesPaths[0]);
                     await AddUser(user);
                     return;
                 }
@@ -498,7 +498,7 @@ namespace Messenger
             var filePath = Path.Combine(PathChat, $"{normalTime}{nameFile}");
             var sw = new Stopwatch();
             sw.Start();
-            await user.communication.ReceiveFile5(filePath);
+            await user.communication.ReceiveFile(filePath);
             sw.Stop();
             Console.WriteLine(sw.Elapsed);
             await SendMessageAndAddUser("The file has been sent", user);

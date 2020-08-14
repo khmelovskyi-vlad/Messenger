@@ -9,7 +9,7 @@ using System.Threading.Tasks;
 
 namespace Messenger
 {
-    class Communication
+    public class Communication
     {
         public Communication(Socket socket)
         {
@@ -20,39 +20,10 @@ namespace Messenger
         public bool EndTask = false;
         private byte[] buffer;
         const int size = 1024;
-        AutoResetEvent resetSend = new AutoResetEvent(true);
-        AutoResetEvent resetReceive = new AutoResetEvent(false);
-        //public void SendMessageAndAnswerClient(string message)
-        //{
-        //    SendMessage(message);
-        //    AnswerClient();
-        //}
-        //public void AnswerClient()
-        //{
-        //    buffer = new byte[size];
-        //    data = new StringBuilder();
-        //    do
-        //    {
-        //        listener.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveCallback, listener);
-        //        resetReceive.WaitOne();
-        //    } while (listener.Available > 0);
-        //    CheckEndTask(listener);
-        //}
         public async Task SendMessageAndAnswerClient(string message)
         {
             await SendMessage(message);
             await AnswerClient();
-        }
-        public async Task AnswerClient()
-        {
-            buffer = new byte[size];
-            data = new StringBuilder();
-            do
-            {
-                var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), socket.EndReceive);
-                data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-            } while (socket.Available > 0);
-            await CheckEndTask(socket);
         }
         private async Task CheckEndTask(Socket listener)
         {
@@ -63,105 +34,141 @@ namespace Messenger
                 throw new OperationCanceledException();
             }
         }
-        //private void ReceiveCallback(IAsyncResult AR)
-        //{
-        //    Socket current = (Socket)AR.AsyncState;
-        //    int received;
-
-        //    try
-        //    {
-        //        received = current.EndReceive(AR);
-        //    }
-        //    catch (SocketException)
-        //    {
-        //        Console.WriteLine("Client forcefully disconnected");
-        //        resetReceive.Set();
-        //        return;
-        //    }
-        //    data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-        //    resetReceive.Set();
-        //}
-        //private void CheckEndTask(Socket listener)
-        //{
-        //    if (EndTask == true)
-        //    {
-        //        resetSend.WaitOne();
-        //        byte[] byteData = Encoding.ASCII.GetBytes("?/you left the chat");
-        //        listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-        //        throw new OperationCanceledException();
-        //    }
-        //}
-        //public void SendMessage(string message)
-        //{
-        //    resetSend.WaitOne();
-        //    byte[] byteData = Encoding.ASCII.GetBytes(message);
-        //    listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallback, listener);
-        //}
-        //private void SendCallback(IAsyncResult AR)
-        //{
-        //    Socket current = (Socket)AR.AsyncState;
-        //    try
-        //    {
-        //        current.EndSend(AR);
-        //    }
-        //    catch (SocketException)
-        //    {
-        //        Console.WriteLine("Can`t send message");
-        //    }
-        //    resetSend.Set();
-        //}
-        private void SendCallbackk(IAsyncResult AR)
+        public async Task AnswerClient()
         {
-            Socket current = (Socket)AR.AsyncState;
-            try
+            var mesLength = await FindMessageLength();
+
+            buffer = new byte[size];
+            data = new StringBuilder();
+            do
             {
-                current.EndSend(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Can`t send message");
-            }
+                var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), socket.EndReceive);
+                data.Append(Encoding.ASCII.GetString(buffer, 0, received));
+            } while (mesLength != data.Length);
+            await CheckEndTask(socket);
         }
         public async Task SendMessage(string message)
         {
             byte[] byteData = Encoding.ASCII.GetBytes(message);
+            var mesLengthByte = CreateFirstMessage(byteData.Length);
+            await Task.Factory.FromAsync(socket.BeginSend(mesLengthByte, 0, mesLengthByte.Length, SocketFlags.None, null, null), socket.EndSend);
             await Task.Factory.FromAsync(socket.BeginSend(byteData, 0, byteData.Length, SocketFlags.None, null, null), socket.EndSend);
-            //await Task.Factory.FromAsync(listener.BeginSend(byteData, 0, byteData.Length, 0, SendCallbackk, listener), listener.EndSend);
         }
-        public void SendFile(string fileName)
+
+
+
+
+        //private byte[] CreateFirstMessage(long byteLength)
+        //{
+        //    var arrayByteLanght = BitConverter.GetBytes(byteLength);
+        //    if (byteLength < 65535)
+        //    {
+        //        return new byte[3] { arrayByteLanght[0], arrayByteLanght[1], 1 };
+        //    }
+        //    else if (byteLength < 4294967295)
+        //    {
+        //        return new byte[6] { arrayByteLanght[0], arrayByteLanght[1], 0, arrayByteLanght[2], arrayByteLanght[3], 1 };
+        //    }
+        //    else
+        //    {
+        //        return new byte[10] { arrayByteLanght[0], arrayByteLanght[1], 0, arrayByteLanght[2], arrayByteLanght[3], 0,
+        //        arrayByteLanght[4], arrayByteLanght[5], arrayByteLanght[6], arrayByteLanght[7] };
+        //    }
+        //}
+        //private async Task<long> FindMessageLength()
+        //{
+        //    var byteCount = 3;
+        //    var resultBuffer = new List<byte>();
+        //    var buffer = new byte[byteCount];
+        //    var needAdd = true;
+        //    for (int i = 0; i < 2; i++)
+        //    {
+        //        await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
+        //        resultBuffer.Add(buffer[0]);
+        //        resultBuffer.Add(buffer[1]);
+        //        if (buffer[2] == 1)
+        //        {
+        //            needAdd = false;
+        //            break;
+        //        }
+        //        buffer = new byte[byteCount];
+        //    }
+        //    if (needAdd)
+        //    {
+        //        buffer = new byte[4];
+        //        await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
+        //        resultBuffer.AddRange(buffer);
+        //    }
+        //    if (resultBuffer.Count() == 2)
+        //    {
+        //        return BitConverter.ToUInt16(resultBuffer.ToArray(), 0);
+        //    }
+        //    else if (resultBuffer.Count() == 4)
+        //    {
+        //        return BitConverter.ToUInt32(resultBuffer.ToArray(), 0);
+        //    }
+        //    else
+        //    {
+        //        return BitConverter.ToInt64(resultBuffer.ToArray(), 0);
+        //    }
+        //}
+        private byte[] CreateFirstMessage(long byteLength)
         {
-            var length = new FileInfo(fileName).Length;
-            var lengthByte = BitConverter.GetBytes(length);
-            socket.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, SendFileCallback, socket);
-            resetSend.WaitOne();
+            var arrayByteLanght = BitConverter.GetBytes(byteLength);
+            if (byteLength < 65535)
+            {
+                return new byte[3] { 2, arrayByteLanght[0], arrayByteLanght[1] };
+            }
+            else if (byteLength < 4294967295)
+            {
+                return new byte[5] { 4, arrayByteLanght[0], arrayByteLanght[1], arrayByteLanght[2], arrayByteLanght[3] };
+            }
+            else
+            {
+                return new byte[9] { 8, arrayByteLanght[0], arrayByteLanght[1], arrayByteLanght[2], arrayByteLanght[3],
+                arrayByteLanght[4], arrayByteLanght[5], arrayByteLanght[6], arrayByteLanght[7] };
+            }
         }
-        public async Task SendFile2(string fileName)
+        private async Task<long> FindMessageLength()
         {
-            var length = new FileInfo(fileName).Length;
-            var lengthByte = BitConverter.GetBytes(length);
+            var resultBuffer = new List<byte>();
+            var byteCount = 1;
+            var buffer = new byte[byteCount];
+            await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
+            return await GetBufferLength(buffer[0]);
+        }
+        private async Task<long> GetBufferLength(int byteCount)
+        {
+            var buffer = new byte[byteCount];
+            await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
+            if (byteCount == 2)
+            {
+                return BitConverter.ToUInt16(buffer, 0);
+            }
+            else if (byteCount == 4)
+            {
+                return BitConverter.ToUInt32(buffer, 0);
+            }
+            else
+            {
+                return BitConverter.ToInt64(buffer, 0);
+            }
+        }
+
+
+
+
+        public async Task SendFile(string fileName)
+        {
+            var lengthByte = CreateFirstMessage(new FileInfo(fileName).Length);
             await Task.Factory.FromAsync(
                 socket.BeginSendFile(fileName, lengthByte, null, TransmitFileOptions.UseKernelApc, null, null),
                 socket.EndSendFile);
         }
-        private void SendFileCallback(IAsyncResult AR)
+
+        public async Task ReceiveFile(string path)
         {
-            Socket current = (Socket)AR.AsyncState;
-            try
-            {
-                current.EndSendFile(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Can`t send file");
-            }
-            resetSend.Set();
-        }
-        public async Task ReceiveFile5(string path)
-        {
-            var byteCount = 8;
-            var bufferFileLength = new byte[byteCount];
-            await Task.Factory.FromAsync(socket.BeginReceive(bufferFileLength, 0, byteCount, SocketFlags.None, null, null), socket.EndReceive);
-            var fileLength = BitConverter.ToInt64(bufferFileLength, 0);
+            var fileLength = await FindMessageLength();
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
@@ -171,107 +178,6 @@ namespace Messenger
                         socket.EndReceive);
                     await stream.WriteAsync(buffer, 0, received);
                 } while (stream.Length != fileLength);
-            }
-        }
-        public async Task ReceiveFile(string path)
-        {
-            buffer = new byte[8];
-            socket.BeginReceive(buffer, 0, 8, SocketFlags.None, ReceiveFileCallback, socket);
-            resetReceive.WaitOne();
-            var fileLength = BitConverter.ToInt64(buffer, 0);
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
-            {
-                buffer = new byte[size];
-                do
-                {
-                    socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallback, socket);
-                    resetReceive.WaitOne();
-                    await stream.WriteAsync(buffer, 0, countReceivedBytes);
-                } while (stream.Length != fileLength);
-            }
-        }
-        public async Task ReceiveFile2(string path)
-        {
-            buffer = new byte[8];
-            var bufferSize = socket.Receive(buffer);
-            var fileLength = BitConverter.ToInt64(buffer, 0);
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
-            {
-                buffer = new byte[size];
-                var endSend = 0;
-                do
-                {
-                    bufferSize = socket.Receive(buffer);
-                    endSend = endSend + bufferSize;
-                    await stream.WriteAsync(buffer, 0, bufferSize);
-                } while (endSend != fileLength);
-            }
-        }
-        private int countReceivedBytes = 0;
-        private void ReceiveFileCallback(IAsyncResult AR)
-        {
-            Socket current = (Socket)AR.AsyncState;
-            try
-            {
-                countReceivedBytes = current.EndReceive(AR);
-            }
-            catch (SocketException)
-            {
-                Console.WriteLine("Client forcefully disconnected");
-                resetReceive.Set();
-                return;
-            }
-            resetReceive.Set();
-        }
-        public void ReceiveFile3(string path)
-        {
-            buffer = new byte[8];
-            var bufferSize = socket.Receive(buffer);
-            var fileLength = BitConverter.ToInt64(buffer, 0);
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
-            {
-                buffer = new byte[size];
-                do
-                {
-                    bufferSize = socket.Receive(buffer);
-                    stream.Write(buffer, 0, bufferSize);
-                } while (stream.Length != fileLength);
-            }
-        }
-        public void ReceiveFile4(string path)
-        {
-            buffer = new byte[8];
-            var bufferSize = socket.Receive(buffer);
-            var fileLength = BitConverter.ToInt64(buffer, 0);
-            using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
-            {
-                buffer = new byte[size];
-                StateObject stateObject = new StateObject { socket = socket, stream = stream, fileLength = fileLength };
-                socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
-                resetReceive.WaitOne();
-            }
-        }
-        public class StateObject
-        {
-            public long fileLength;
-            public Socket socket = null;
-            public FileStream stream;
-        }
-        private void ReceiveFileCallbackk(IAsyncResult AR)
-        {
-            var stateObject = (StateObject)AR.AsyncState;
-            var received = stateObject.socket.EndReceive(AR);
-            if (received > 0)
-            {
-                stateObject.stream.Write(buffer, 0, received);
-            }
-            if (stateObject.fileLength != stateObject.stream.Length)
-            {
-                stateObject.socket.BeginReceive(buffer, 0, size, SocketFlags.None, ReceiveFileCallbackk, stateObject);
-            }
-            else
-            {
-                resetReceive.Set();
             }
         }
     }
