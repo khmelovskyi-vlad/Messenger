@@ -20,10 +20,10 @@ namespace Messenger
         public bool EndTask = false;
         private byte[] buffer;
         const int size = 1024;
-        public async Task SendMessageAndAnswerClient(string message)
+        public async Task<string> SendMessageAndAnswerClient(string message)
         {
             await SendMessage(message);
-            await AnswerClient();
+            return await AnswerClient();
         }
         private async Task CheckEndTask(Socket listener)
         {
@@ -34,18 +34,19 @@ namespace Messenger
                 throw new OperationCanceledException();
             }
         }
-        public async Task AnswerClient()
+        public async Task<string> AnswerClient()
         {
             var mesLength = await FindMessageLength();
 
             buffer = new byte[size];
             data = new StringBuilder();
-            do
+            while (mesLength != data.Length)
             {
                 var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), socket.EndReceive);
                 data.Append(Encoding.ASCII.GetString(buffer, 0, received));
-            } while (mesLength != data.Length);
+            }
             await CheckEndTask(socket);
+            return data.ToString();
         }
         public async Task SendMessage(string message)
         {
@@ -172,12 +173,12 @@ namespace Messenger
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
                 buffer = new byte[size];
-                do
+                while (stream.Length != fileLength)
                 {
                     var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), 
                         socket.EndReceive);
                     await stream.WriteAsync(buffer, 0, received);
-                } while (stream.Length != fileLength);
+                }
             }
         }
     }

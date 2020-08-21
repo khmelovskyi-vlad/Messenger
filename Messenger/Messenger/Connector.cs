@@ -76,14 +76,12 @@ namespace Messenger
         }
         private async Task<bool> SelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
-            await communication.SendMessage($"If you want to connect to the server using your account, press Enter,{Environment.NewLine}" +
+            var successConnection = false;
+            switch (await communication.SendMessageAndAnswerClient($"If you want to connect to the server using your account, press Enter,{Environment.NewLine}" +
                 $"if you want to create a new account, press Tab,{Environment.NewLine}" +
                 $"if you want to log out, click Escape,{Environment.NewLine}" +
                 $"if you want to delete your account, click Delete,{Environment.NewLine}" +
-                $"if you want to exit the messenger, write '??' at any moment{Environment.NewLine}");
-            await communication.AnswerClient();
-            var successConnection = false;
-            switch (communication.data.ToString())
+                $"if you want to exit the messenger, write '??' at any moment{Environment.NewLine}"))
             {
                 case "using":
                     successConnection = await ConnectRegisteredUser(usersData);
@@ -174,12 +172,12 @@ namespace Messenger
             while (true)
             {
                 var findNick = false;
-                await communication.AnswerClient();
+                var nick = await communication.AnswerClient();
                 if (userData != null)
                 {
                     foreach (var userNicknameAndPassword in userData)
                     {
-                        if (communication.data.ToString() == userNicknameAndPassword.Nickname)
+                        if (nick == userNicknameAndPassword.Nickname)
                         {
                             findNick = true;
                             await communication.SendMessage("This nickname is currently in use, enter new please");
@@ -189,80 +187,79 @@ namespace Messenger
                 }
                 if (!findNick)
                 {
-                    return await EnterPasswordAndSaveData();
+                    return await EnterPasswordAndSaveData(nick);
                 }
             }
         }
-        private async Task<bool> EnterPasswordAndSaveData()
+        private async Task<bool> EnterPasswordAndSaveData(string nick)
         {
-            while (true)
+            nick = await CheckNickname(nick);
+            if (nick.Length == 0)
             {
-                var nick = await CheckNickname();
-                if (nick.Length == 0)
+                return false;
+            }
+            var password = await CheckPassword(new UserNicknameAndPasswordAndIPs(), false);
+            if (password == "")
+            {
+                return false;
+            }
+            else
+            {
+                return await AddNewUser(new string[] { nick, password });
+            }
+        }
+        private async Task<string> CheckNickname(string nick)
+        {
+            var lastString = "";
+            for (int i = 10; i > 0; i--)
+            {
+                lastString = $"{Environment.NewLine}a number of attempts  left = {i - 1}";
+                if (nick.Length <= 5)
                 {
-                    return false;
-                }
-                var password = await CheckPassword(new UserNicknameAndPasswordAndIPs(), false);
-                if (password == "")
-                {
-                    if (!CheckWantingToConnect())
-                    {
-                        return false;
-                    }
+                    await communication.SendMessage(CreateMessage($"Enter nickname bigger than 5 symbols {lastString}", i));
                 }
                 else
                 {
-                    return await AddNewUser(new string[] { nick, password });
-                }
-            }
-        }
-        private async Task<string> CheckNickname()
-        {
-            while (true)
-            {
-                var lastString = "";
-                for (int i = 0; i < 10; i++)
-                {
-                    if (i == 9)
+                    var goodInput = CharacterCheckers.CheckInput(nick);
+                    if (goodInput)
                     {
-                        lastString = $"{Environment.NewLine}You really want to conect to the server, if yes - click Enter";
-                    }
-                    if (communication.data.Length <= 5)
-                    {
-                        await communication.SendMessage($"Enter nickname bigger than 5 symbols {lastString}");
-                    }
-                    else
-                    {
-                        var goodInput = CharacterCheckers.CheckInput(communication.data.ToString());
-                        if(goodInput)
+                        if (!await CheckNicknamesBan(nick))
                         {
-                            if (!await CheckNicknamesBan(communication.data.ToString()))
+                            if (!CheckNicknamesOnline(nick))
                             {
-                                if (!CheckNicknamesOnline(communication.data.ToString()))
-                                {
-                                    return communication.data.ToString();
-                                }
-                                else
-                                {
-                                    await communication.SendMessage($"This nickname is online, write else {lastString}");
-                                }
+                                return nick;
                             }
                             else
                             {
-                                await communication.SendMessage($"This nickname is in ban, write else {lastString}");
+                                await communication.SendMessage(CreateMessage($"This nickname is online, write else {lastString}", i));
                             }
                         }
                         else
                         {
-                            await communication.SendMessage($"The nickname can only contain lowercase letters and numbers {lastString}");
+                            await communication.SendMessage(CreateMessage($"This nickname is in ban, write else {lastString}", i));
                         }
                     }
-                    await communication.AnswerClient();
+                    else
+                    {
+                        await communication.SendMessage(CreateMessage($"The nickname can only contain lowercase letters and numbers {lastString}", i));
+                    }
                 }
-                if (!CheckWantingToConnect())
+                if (i != 1)
                 {
-                    return "";
+                    nick = await communication.AnswerClient();
                 }
+            }
+            return "";
+        }
+        private string CreateMessage(string message, int i)
+        {
+            if (i == 1)
+            {
+                return "Number of attempts 0, so bye";
+            }
+            else
+            {
+                return message;
             }
         }
         private bool CheckNicknamesOnline(string nick)
@@ -272,9 +269,9 @@ namespace Messenger
                 return messenger.online.Select(user => user.Nickname).Contains(nick);
             }
         }
-        private bool CheckWantingToConnect()
+        private async Task<bool> CheckWantingToConnect()
         {
-            if (communication.data.ToString() == "Enter")
+            if (await communication.AnswerClient() == "Enter")
             {
                 return true;
             }
@@ -282,8 +279,7 @@ namespace Messenger
         }
         private async Task<UserNicknameAndPasswordAndIPs> CheckNicknameAndPassword(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
-            await communication.SendMessage("Enter a nickname");
-            await communication.AnswerClient();
+            var nick = await communication.SendMessageAndAnswerClient("Enter a nickname");
             if (userData == null)
             {
                 await communication.SendMessage("Don`t have your data");
@@ -291,8 +287,7 @@ namespace Messenger
             }
             while (true)
             {
-                var findNick = false;
-                var nick = await CheckNickname();
+                nick = await CheckNickname(nick);
                 if (nick.Length == 0)
                 {
                     return default(UserNicknameAndPasswordAndIPs);
@@ -301,7 +296,6 @@ namespace Messenger
                 {
                     if (nick == userNicknameAndPassword.Nickname)
                     {
-                        findNick = true;
                         if (await CheckPassword(userNicknameAndPassword, true) != "")
                         {
                             await communication.SendMessage("You enter to messenger");
@@ -310,57 +304,56 @@ namespace Messenger
                         }
                         else
                         {
-                            if (!CheckWantingToConnect())
-                            {
-                                return default(UserNicknameAndPasswordAndIPs);
-                            }
+                            return default(UserNicknameAndPasswordAndIPs);
                         }
                     }
                 }
-                if (!findNick)
-                {
-                    await communication.SendMessage("Wrong nickname, enter new");
-                    await communication.AnswerClient();
-                }
+                nick = await communication.SendMessageAndAnswerClient("Wrong nickname, enter new");
             }
         }
         private async Task<string> CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
         {
             await communication.SendMessage("Enter password bigger than 7 symbols");
-            var numberAttemps = 5;
-            for (int i = 0; i < numberAttemps; i++)
+            for (int i = 5; i > 0; i--)
             {
-                await communication.AnswerClient();
-                if (CheckPasswordCondition(userNicknameAndPassword, checkHavingPassword))
+                var password = await communication.AnswerClient();
+                if (await CheckPasswordCondition(userNicknameAndPassword, checkHavingPassword, password, i))
                 {
-                    return communication.data.ToString();
-                }
-                else
-                {
-                    if (i == 4)
-                    {
-                        await communication.SendMessage($"Password length < 7,{Environment.NewLine}" +
-                            $"You really want to conect to the server, if yes - click Enter");
-                        await communication.AnswerClient();
-                    }
-                    else
-                    {
-                        await communication.SendMessage($"Password length < 7, enter another password, a number of attemps left = {numberAttemps - i - 1}");
-                    }
+                    return password;
                 }
             }
             return "";
         }
-        private bool CheckPasswordCondition(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
+        private async Task<bool> CheckPasswordCondition(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword, string password, int i)
         {
+            if (password.Length < 8)
+            {
+                if (i == 1)
+                {
+                    await communication.SendMessage("Number of attempts 0, so bye");
+                }
+                else
+                {
+                    await communication.SendMessage($"Password length < 8, enter another password, a number of attempts left = {i - 1}");
+                }
+                return false;
+            }
             if (checkHavingPassword)
             {
-                return communication.data.ToString() == userNicknameAndPassword.Password;
+                if (password != userNicknameAndPassword.Password)
+                {
+                    if (i == 1)
+                    {
+                        await communication.SendMessage($"Number of attempts 0, so bye");
+                    }
+                    else
+                    {
+                        await communication.SendMessage($"Wrong password, a number of attempts left = {i - 1}");
+                    }
+                    return false;
+                }
             }
-            else
-            {
-                return communication.data.Length > 7;
-            }
+            return true;
         }
         private async Task<bool> ConnectRegisteredUser(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
