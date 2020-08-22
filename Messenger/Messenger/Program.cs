@@ -17,9 +17,23 @@ namespace Messenger
     {
         static async Task<int> Main(string[] args)
         {
-            var i = BitConverter.GetBytes('i');
-            var l = BitConverter.GetBytes('l');
-            var s = BitConverter.GetBytes('s');
+            //var i = BitConverter.GetBytes('i');
+            //var l = BitConverter.GetBytes('l');
+            //var s = BitConverter.GetBytes('s');
+            //var o = 5;
+            //var k = 6;
+            //if (o == 5)
+            //{
+            //    Console.WriteLine(5);
+            //}
+            //else if (k == 6)
+            //{
+            //    Console.WriteLine(6);
+            //}
+            //else
+            //{
+            //    Console.WriteLine(0);
+            //}
             //char k = '3';
             //var l = BitConverter.GetBytes(true);
             //var l23 = BitConverter.GetBytes(false);

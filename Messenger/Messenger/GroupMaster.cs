@@ -31,7 +31,7 @@ namespace Messenger
         {
             while (true)
             {
-                await SendMessage($"Enter type of chat, what do you need{Environment.NewLine}" +
+                var message = await user.communication.SendMessageListenClient($"Enter type of chat, what do you need{Environment.NewLine}" +
                     $"pp - people chat, ch - created chat with people, sg - secret group, ug - user group, pg - public group{Environment.NewLine}" +
                     $"ii - accept the invitation{Environment.NewLine}" +
                     $"Helper:{Environment.NewLine}" +
@@ -45,19 +45,16 @@ namespace Messenger
                     $"Write all invitations: ?/ii, find invitation: ?/ii...{Environment.NewLine}" +
                     $"If you want create new group, write ?/ng{Environment.NewLine}" +
                     $"If you want exit, write: exit{Environment.NewLine}");
-                await AnswerClient();
-                var message = user.communication.data.ToString();
                 if (message.Length > 3 && message[0] == '?' && message[1] == '/')
                 {
-                    await SendMessage("Ok");
-                    await AnswerClient();
+                    await user.communication.SendMessage("Ok");
                     if (message.Length == 4)
                     {
-                        var groupInformation = await ChoseGroupSend(message);
-                        if (groupInformation.Name != null)
+                        if (message == "?/ng")
                         {
-                            return groupInformation;
+                            return await CreateNewGroup();
                         }
+                        await ChoseGroupSend(message);
                     }
                     else
                     {
@@ -77,12 +74,12 @@ namespace Messenger
                     }
                     else if (message == "pp" || message == "ch" || message == "sg" || message == "ug" || message == "pg")
                     {
-                        return await FindNeedGroup(message, message);
+                        return await FindNeedGroup(message);
                     }
                 }
             }
         }
-        private async Task<GroupInformation> FindNeedGroup(string message, string typeGroup)
+        private async Task<GroupInformation> FindNeedGroup(string typeGroup)
         {
             GroupInformation groupInformation;
             if (typeGroup == "ch" || typeGroup == "pp")
@@ -95,8 +92,7 @@ namespace Messenger
             }
             while (true)
             {
-                await AnswerClient();
-                groupInformation = await CheckChatAndCreatePath(user.communication.data.ToString(), typeGroup);
+                groupInformation = await CheckChatAndCreatePath(await user.communication.ListenClient(), typeGroup);
                 if (groupInformation.CanOpenChat)
                 {
                     await SendMessage("You connect to chat");
@@ -234,8 +230,7 @@ namespace Messenger
                 "if you want to look at the invitations, write: look");
             while (true)
             {
-                await AnswerClient();
-                var message = user.communication.data.ToString();
+                var message = await user.communication.ListenClient();
                 switch (message)
                 {
                     case "join":
@@ -254,18 +249,16 @@ namespace Messenger
             await SendMessage("Write the name of the group");
             while (true)
             {
-                await AnswerClient();
-                var groupName = user.communication.data.ToString();
+                var groupName = await user.communication.ListenClient();
+                //var needInvitations = userChats.Invitations.Where(invitation => invitation[0] == 'r' && invitation.Remove(0, 8) == groupName);
                 foreach (var invitation in userChats.Invitations)
                 {
                     var normalInvitation = invitation.Remove(0, 8);
                     if (groupName == normalInvitation)
                     {
                         var groupInformation = await EnterTheGroup(invitation, groupName);
-                        await SendMessage($"You have joined to the group{Environment.NewLine}" +
-                            "If you want to open chats, write: 'open'");
-                        await AnswerClient();
-                        if (user.communication.data.ToString() == "open")
+                        if (await user.communication.SendMessageListenClient($"You have joined to the group{Environment.NewLine}" +
+                            "If you want to open chats, write: 'open'") == "open")
                         {
                             await SendMessage("You enter to the group");
                             return groupInformation;
@@ -316,7 +309,7 @@ namespace Messenger
                 return (users, true);
             });
         }
-        private async Task<GroupInformation> ChoseGroupSend(string message)
+        private async Task ChoseGroupSend(string message)
         {
             switch (message)
             {
@@ -344,12 +337,7 @@ namespace Messenger
                 case "?/ii":
                     await SendGroups(userChats.Invitations, "Invitation:");
                     break;
-                case "?/ng":
-                    return await CreateNewGroup();
-                default:
-                    return new GroupInformation() { CanOpenChat = false };
             }
-            return new GroupInformation() { CanOpenChat = false };
         }
         private async Task<GroupInformation> CreateNewGroup()
         {
@@ -416,19 +404,15 @@ namespace Messenger
         private async Task SendGroups(IEnumerable<string> groups, string firstMassage)
         {
             await SendMessage(firstMassage);
-            await AnswerClient();
             if (groups == null || groups.Count() == 0)
             {
                 await SendMessage("0");
-                await AnswerClient();
                 return;
             }
             await SendMessage(groups.Count().ToString());
-            await AnswerClient();
             foreach (var group in groups)
             {
                 await SendMessage(group);
-                await AnswerClient();
             }
         }
         private async Task SendMessage(string message)
@@ -437,7 +421,7 @@ namespace Messenger
         }
         private async Task AnswerClient()
         {
-            await user.communication.AnswerClient();
+            await user.communication.ListenClient();
         }
 
     }

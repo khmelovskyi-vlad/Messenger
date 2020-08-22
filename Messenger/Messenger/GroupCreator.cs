@@ -29,8 +29,7 @@ namespace Messenger
                 "If secret, write 'sg', if public, write 'pg'");
             while (true)
             {
-                await AnswerClient();
-                var typeGroup = user.communication.data.ToString();
+                var typeGroup = await user.communication.ListenClient();
                 if (typeGroup == "sg" || typeGroup == "pg")
                 {
                     return typeGroup;
@@ -44,20 +43,23 @@ namespace Messenger
             await SendMessage("Enter a group name");
             while (true)
             {
-                await AnswerClient();
-                var groupName = user.communication.data.ToString();
-                var goodInput = CharacterCheckers.CheckInput(groupName);
-                if (!goodInput)
+                var groupName = await user.communication.ListenClient();
+                if (!CharacterCheckers.CheckInput(groupName))
                 {
                     await SendMessage("The group name can only contain lowercase letters and numbers");
-                    continue;
                 }
-                else if (!CheckGroups(groupName, typeGroup))
+                else if (groupName.Length == 0)
+                {
+                    await SendMessage("Group name length can't be 0");
+                }
+                else if (CheckGroups(groupName, typeGroup))
                 {
                     await SendMessage("A group with this name has already been created, enter new plese");
-                    continue;
                 }
-                return groupName;
+                else
+                {
+                    return groupName;
+                }
             }
         }
         private bool CheckGroups(string nameGroup, string typeGroup)
@@ -65,14 +67,16 @@ namespace Messenger
             switch (typeGroup)
             {
                 case "pg":
-                    return !(FileMaster.GetDirectories(messenger.Server.PublicGroupPath) ?? new string[0])
-                        .Select(path => FileMaster.GetFileName(path))
-                        .Contains(nameGroup);
+                    return CheckHavingGroup(nameGroup, messenger.Server.PublicGroupPath);
                 default: //(sg)
-                    return !(FileMaster.GetDirectories(messenger.Server.SecretGroupPath) ?? new string[0])
-                        .Select(path => FileMaster.GetFileName(path))
-                        .Contains(nameGroup);
+                    return CheckHavingGroup(nameGroup, messenger.Server.SecretGroupPath);
             }
+        }
+        private bool CheckHavingGroup(string nameGroup, string path)
+        {
+            return (FileMaster.GetDirectories(path) ?? new string[0])
+                .Select(directoryPath => FileMaster.GetFileName(directoryPath))
+                .Contains(nameGroup);
         }
         public async Task<GroupInformation> Run()
         {
@@ -84,13 +88,13 @@ namespace Messenger
             var invitedPeople = new List<string>();
             while (true)
             {
-                await AnswerClient();
-                if (user.communication.data.ToString() == "?/yes")
+                var message = await user.communication.ListenClient();
+                if (message == "?/yes")
                 {
                     people = await FindChatsPeople();
                     await SendGroups(people, "People:");
                 }
-                else if (user.communication.data.ToString() == "?/no")
+                else if (message == "?/no")
                 {
                     if (canCreate)
                     {
@@ -103,10 +107,10 @@ namespace Messenger
                 }
                 else
                 {
-                    var nick = user.communication.data.ToString();
+                    var nick = message;
                     if (CheckPeople(people, nick))
                     {
-                        if (CheckInInvitedList(invitedPeople, nick))
+                        if (!CheckInInvitedList(invitedPeople, nick))
                         {
                             invitedPeople.Add(nick);
                             canCreate = true;
@@ -129,16 +133,15 @@ namespace Messenger
         }
         private bool CheckInInvitedList(List<string> invitedPeople, string nick)
         {
-            return !invitedPeople.Contains(nick);
+            return invitedPeople.Contains(nick);
         }
         private async Task<GroupInformation> CreateNewGroup(string nameGroup, string typeGroup, List<string> invitedPeople)
         {
             var pathGroup = await AddGroup(nameGroup, typeGroup, invitedPeople);
             await InvitePeople(invitedPeople, nameGroup, typeGroup);
-            await SendMessage($"You create group, thanks.{Environment.NewLine}" +
-                "If you want to open it, write ok, else - press else");
-            await AnswerClient();
-            if (user.communication.data.ToString() == "ok")
+            await SendMessage($"You created a group, thanks.{Environment.NewLine}" +
+                    "If you want to open it - write ok, else - write else");
+            if (await user.communication.ListenClient() == "ok")
             {
                 return new GroupInformation (true, typeGroup, nameGroup, pathGroup );
             }
@@ -201,19 +204,15 @@ namespace Messenger
         private async Task SendGroups(IEnumerable<string> groups, string firstMassage)
         {
             await SendMessage(firstMassage);
-            await AnswerClient();
             if (groups == null || groups.Count() == 0)
             {
                 await SendMessage("0");
-                await AnswerClient();
                 return;
             }
             await SendMessage(groups.Count().ToString());
-            await AnswerClient();
             foreach (var group in groups)
             {
                 await SendMessage(group);
-                await AnswerClient();
             }
         }
         private async Task<List<string>> FindChatsPeople()
@@ -230,11 +229,7 @@ namespace Messenger
 
 
 
-
-        private async Task AnswerClient()
-        {
-            await user.communication.AnswerClient();
-        }
+        
         private async Task SendMessage(string message)
         {
             await user.communication.SendMessage(message);

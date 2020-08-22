@@ -102,21 +102,17 @@ namespace Messenger
         }
         private async Task<bool> CheckLeftMessanger(User user)
         {
-            var result = true;
-            await user.communication.AnswerClient();
             await user.communication.SendMessage("If you want to left the messanger, write: 'exit'");
-            await user.communication.AnswerClient();
-            if (user.communication.data.ToString() == "exit")
+            if (await user.communication.ListenClient() == "exit")
             {
                 await user.communication.SendMessage("You left the messanger");
+                return true;
             }
             else
             {
                 await user.communication.SendMessage("Ok, choose new chat");
-                result = false;
+                return false;
             }
-            await user.communication.AnswerClient();
-            return result;
         }
         private bool CheckOnline(string nickname)
         {
@@ -134,24 +130,22 @@ namespace Messenger
         }
         private async Task OpenCreateChat(User user, GroupInformation groupInformation)
         {
-            var findChat = false;
             foreach (var chat in chats)
             {
                 if (groupInformation.Name == chat.NameChat)
                 {
-                    findChat = true;
-                    await chat.Run(user, false);
-                    CheckOnline(chat);
-                    break;
+                    await ChatStart(chat, user, false);
+                    return;
                 }
             }
-            if (!findChat)
-            {
-                Chat chat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path, this);
-                chats.Add(chat);
-                await chat.Run(user, true);
-                CheckOnline(chat);
-            }
+            Chat newChat = new Chat(groupInformation.Type, groupInformation.Name, groupInformation.Path, this);
+            chats.Add(newChat);
+            await ChatStart(newChat, user, true);
+        }
+        private async Task ChatStart(Chat chat, User user, bool firstConnect)
+        {
+            await chat.Run(user, firstConnect);
+            CheckOnline(chat);
         }
         private void CheckOnline(Chat chat)
         {

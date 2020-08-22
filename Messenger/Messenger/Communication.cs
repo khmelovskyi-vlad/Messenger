@@ -20,10 +20,10 @@ namespace Messenger
         public bool EndTask = false;
         private byte[] buffer;
         const int size = 1024;
-        public async Task<string> SendMessageAndAnswerClient(string message)
+        public async Task<string> SendMessageListenClient(string message)
         {
             await SendMessage(message);
-            return await AnswerClient();
+            return await ListenClient();
         }
         private async Task CheckEndTask(Socket listener)
         {
@@ -34,7 +34,7 @@ namespace Messenger
                 throw new OperationCanceledException();
             }
         }
-        public async Task<string> AnswerClient()
+        public async Task<string> ListenClient()
         {
             var mesLength = await FindMessageLength();
 
@@ -182,4 +182,4 @@ namespace Messenger
             }
         }
     }
-}
+    }

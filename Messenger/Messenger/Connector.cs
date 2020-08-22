@@ -77,7 +77,7 @@ namespace Messenger
         private async Task<bool> SelectMode(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
             var successConnection = false;
-            switch (await communication.SendMessageAndAnswerClient($"If you want to connect to the server using your account, press Enter,{Environment.NewLine}" +
+            switch (await communication.SendMessageListenClient($"If you want to connect to the server using your account, press Enter,{Environment.NewLine}" +
                 $"if you want to create a new account, press Tab,{Environment.NewLine}" +
                 $"if you want to log out, click Escape,{Environment.NewLine}" +
                 $"if you want to delete your account, click Delete,{Environment.NewLine}" +
@@ -103,15 +103,12 @@ namespace Messenger
         }
         private async Task<bool> DisconectUser(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
         {
-            await communication.SendMessage("You realy want to disconect? If yes click Enter");
-            await communication.AnswerClient();
-            if (communication.data.ToString() == "Yes")
+            if (await communication.SendMessageListenClient("You realy want to disconect? If yes click Enter") == "Yes")
             {
                 await communication.SendMessage("Ok, bye");
                 return false;
             }
-            await communication.SendMessage("Сhoose what you want to do");
-            await communication.AnswerClient();
+            await communication.SendMessage("Choose what you want to do");
             return await SelectMode(usersData);
         }
         private async Task<bool> DeleteAccount(IEnumerable<UserNicknameAndPasswordAndIPs> usersData)
@@ -121,11 +118,9 @@ namespace Messenger
             {
                 return false;
             }
-            await communication.SendMessage("Do you realy want, delete your accaunt? if yes, click Enter");
-            await communication.AnswerClient();
-            if (communication.data.ToString() != "Yes")
+            if (await communication.SendMessageListenClient("Do you realy want, delete your accaunt? if yes, click Enter") != "Yes")
             {
-                return false;
+                return await SelectMode(usersData);
             }
             var result = await FileMaster.UpdateFile<UserNicknameAndPasswordAndIPs>(FilePath, oldData =>
             {
@@ -148,12 +143,13 @@ namespace Messenger
                 await communication.SendMessage("Account was deleted");
                 UserDeleter userDeleter = new UserDeleter(messenger);
                 await userDeleter.Run(userNicknameAndPassword.Nickname, false);
+                return false;
             }
             else
             {
                 await communication.SendMessage("Don`t have this nickname");
+                return await SelectMode(usersData);
             }
-            return false;
         }
         private bool LastFindData(IEnumerable<UserNicknameAndPasswordAndIPs> usersData, string nick)
         {
@@ -172,7 +168,7 @@ namespace Messenger
             while (true)
             {
                 var findNick = false;
-                var nick = await communication.AnswerClient();
+                var nick = await communication.ListenClient();
                 if (userData != null)
                 {
                     foreach (var userNicknameAndPassword in userData)
@@ -246,7 +242,7 @@ namespace Messenger
                 }
                 if (i != 1)
                 {
-                    nick = await communication.AnswerClient();
+                    nick = await communication.ListenClient();
                 }
             }
             return "";
@@ -271,7 +267,7 @@ namespace Messenger
         }
         private async Task<bool> CheckWantingToConnect()
         {
-            if (await communication.AnswerClient() == "Enter")
+            if (await communication.ListenClient() == "Enter")
             {
                 return true;
             }
@@ -279,7 +275,7 @@ namespace Messenger
         }
         private async Task<UserNicknameAndPasswordAndIPs> CheckNicknameAndPassword(IEnumerable<UserNicknameAndPasswordAndIPs> userData)
         {
-            var nick = await communication.SendMessageAndAnswerClient("Enter a nickname");
+            var nick = await communication.SendMessageListenClient("Enter a nickname");
             if (userData == null)
             {
                 await communication.SendMessage("Don`t have your data");
@@ -308,7 +304,7 @@ namespace Messenger
                         }
                     }
                 }
-                nick = await communication.SendMessageAndAnswerClient("Wrong nickname, enter new");
+                nick = await communication.SendMessageListenClient("Wrong nickname, enter new");
             }
         }
         private async Task<string> CheckPassword(UserNicknameAndPasswordAndIPs userNicknameAndPassword, bool checkHavingPassword)
@@ -316,7 +312,7 @@ namespace Messenger
             await communication.SendMessage("Enter password bigger than 7 symbols");
             for (int i = 5; i > 0; i--)
             {
-                var password = await communication.AnswerClient();
+                var password = await communication.ListenClient();
                 if (await CheckPasswordCondition(userNicknameAndPassword, checkHavingPassword, password, i))
                 {
                     return password;
