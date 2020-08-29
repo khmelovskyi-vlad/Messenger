@@ -16,10 +16,8 @@ namespace Messenger
             this.socket = socket;
         }
         private Socket socket;
-        public StringBuilder data;
         public bool EndTask = false;
-        private byte[] buffer;
-        const int size = 1024;
+        private const int size = 1024;
         public async Task<string> SendMessageListenClient(string message)
         {
             await SendMessage(message);
@@ -38,11 +36,17 @@ namespace Messenger
         {
             var mesLength = await FindMessageLength();
 
-            buffer = new byte[size];
-            data = new StringBuilder();
+            var bufferSize = size;
+            var buffer = new byte[bufferSize];
+            var data = new StringBuilder();
             while (mesLength != data.Length)
             {
-                var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), socket.EndReceive);
+                if (mesLength - data.Length < bufferSize)
+                {
+                    bufferSize = (int)(mesLength - data.Length);
+                    buffer = new byte[bufferSize];
+                }
+                var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, bufferSize, SocketFlags.None, null, null), socket.EndReceive);
                 data.Append(Encoding.ASCII.GetString(buffer, 0, received));
             }
             await CheckEndTask(socket);
@@ -172,7 +176,7 @@ namespace Messenger
             var fileLength = await FindMessageLength();
             using (var stream = File.Open(path, FileMode.OpenOrCreate, FileAccess.Write))
             {
-                buffer = new byte[size];
+                var buffer = new byte[size];
                 while (stream.Length != fileLength)
                 {
                     var received = await Task.Factory.FromAsync(socket.BeginReceive(buffer, 0, size, SocketFlags.None, null, null), 

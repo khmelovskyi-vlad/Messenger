@@ -63,6 +63,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="CharacterCheckers.cs" />
+    <Compile Include="CommunicationModes.cs" />
     <Compile Include="GroupInformation.cs" />
     <Compile Include="UserChats.cs" />
     <Compile Include="CommandInterpreter.cs" />
